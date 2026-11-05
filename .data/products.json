@@ -1,511 +1,322 @@
 [
   {
-    "name": "Persistent Pastry 1793444988676",
-    "sku": "SKU-PERSIST-1793444988676",
-    "barcode": "444444988676",
-    "category": "Bakery",
-    "costPrice": 1.2,
-    "sellingPrice": 3.5,
-    "stock": 30,
-    "minStockAlert": 5,
-    "id": "prod-1793444988685",
+    "id": "prod-coffee-1",
+    "companyId": "comp-mw3c2j8i-4c25",
+    "name": "Artisan Arabic Coffee 500g",
+    "nameAr": "قهوة عربية فاخرة 500 جرام",
+    "sku": "COF-500",
+    "barcode": "628100000101",
     "barcodes": [
-      "444444988676"
+      "628100000101",
+      "628100000102"
     ],
-    "priceCurrency": "SDG",
-    "imageUrl": null,
-    "customFields": {
-      "barcodes": [
-        "444444988676"
-      ],
-      "priceCurrency": "SDG"
-    },
-    "isActive": true,
-    "createdAt": "2026-10-31T11:09:48.685Z",
-    "updatedAt": "2026-10-31T11:09:48.685Z"
-  },
-  {
-    "id": "prod-1793444988571",
-    "name": "Post-update Name 1793444988561",
-    "nameAr": null,
-    "sku": "SKU-UPDATE-1793444988561",
-    "barcode": "666444988561",
-    "barcodes": [
-      "666444988561"
-    ],
-    "categoryId": null,
-    "category": "Coffee",
-    "categoryAr": null,
-    "costPrice": 3,
-    "sellingPrice": 8.5,
-    "priceCurrency": "SDG",
-    "stock": 25,
-    "minStockAlert": 2,
-    "imageUrl": null,
-    "emoji": "📦",
-    "colorHex": "#d97706",
-    "baseUomId": "uom-pcs",
-    "defaultSellingUomId": "uom-pcs",
-    "customFields": {
-      "barcodes": [
-        "666444988561"
-      ],
-      "priceCurrency": "SDG"
-    },
-    "isActive": true,
-    "createdAt": "2026-10-31T11:09:48.571Z",
-    "updatedAt": "2026-10-31T11:09:48.603Z"
-  },
-  {
-    "name": "Unique SKU Item",
-    "sku": "SKU-UNIQUE-1793444988527",
-    "barcode": "777444988527",
-    "category": "Bakery",
-    "costPrice": 1.5,
-    "sellingPrice": 4,
-    "stock": 20,
-    "minStockAlert": 5,
-    "id": "prod-1793444988536",
-    "barcodes": [
-      "777444988527"
-    ],
-    "priceCurrency": "SDG",
-    "imageUrl": null,
-    "customFields": {
-      "barcodes": [
-        "777444988527"
-      ],
-      "priceCurrency": "SDG"
-    },
-    "isActive": true,
-    "createdAt": "2026-10-31T11:09:48.536Z",
-    "updatedAt": "2026-10-31T11:09:48.536Z"
-  },
-  {
-    "name": "Original Item A",
-    "sku": "SKU-ORIG-1793444988490",
-    "barcode": "888444988490",
-    "category": "Retail",
-    "costPrice": 5,
-    "sellingPrice": 10,
-    "stock": 15,
-    "minStockAlert": 3,
-    "id": "prod-1793444988502",
-    "barcodes": [
-      "888444988490"
-    ],
-    "priceCurrency": "SDG",
-    "imageUrl": null,
-    "customFields": {
-      "barcodes": [
-        "888444988490"
-      ],
-      "priceCurrency": "SDG"
-    },
-    "isActive": true,
-    "createdAt": "2026-10-31T11:09:48.502Z",
-    "updatedAt": "2026-10-31T11:09:48.502Z"
-  },
-  {
-    "name": "Test Matcha Latte 1793444988177",
-    "nameAr": "ماتشا لاتيه تجريبي 1793444988177",
-    "sku": "SKU-MATCHA-1793444988177",
-    "barcode": "999444988177",
     "category": "Beverages",
     "categoryAr": "مشروبات",
-    "costPrice": 2.1,
-    "sellingPrice": 5.75,
-    "stock": 40,
-    "minStockAlert": 5,
-    "emoji": "🍵",
-    "colorHex": "#10b981",
-    "id": "prod-1793444988457",
-    "barcodes": [
-      "999444988177"
-    ],
-    "priceCurrency": "SDG",
-    "imageUrl": null,
-    "customFields": {
-      "barcodes": [
-        "999444988177"
-      ],
-      "priceCurrency": "SDG"
-    },
-    "isActive": true,
-    "createdAt": "2026-10-31T11:09:48.457Z",
-    "updatedAt": "2026-10-31T11:09:48.457Z"
-  },
-  {
-    "name": "Sudanese Gum Arabic 500g",
-    "nameAr": "صمغ عربي سوداني فاخر 500 جرام",
-    "sku": "SKU-153",
-    "barcode": "200975649002",
-    "barcodes": [
-      "200975649002",
-      "6289900320917",
-      "200498860403"
-    ],
-    "category": "Bakery",
-    "costPrice": 2750,
+    "costPrice": 4000,
     "sellingPrice": 5500,
     "priceCurrency": "SDG",
     "stock": 25,
     "minStockAlert": 5,
-    "image": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22120%22%20height%3D%22120%22%3E%3Crect%20width%3D%22120%22%20height%3D%22120%22%20rx%3D%2224%22%20fill%3D%22%23b45309%22%2F%3E%3Ccircle%20cx%3D%2260%22%20cy%3D%2260%22%20r%3D%2236%22%20fill%3D%22%23fbbf24%22%2F%3E%3Ctext%20x%3D%2260%22%20y%3D%2268%22%20font-size%3D%2226%22%20font-family%3D%22sans-serif%22%20font-weight%3D%22bold%22%20text-anchor%3D%22middle%22%20fill%3D%22%231c1917%22%3EGA%3C%2Ftext%3E%3C%2Fsvg%3E",
-    "imageUrl": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22120%22%20height%3D%22120%22%3E%3Crect%20width%3D%22120%22%20height%3D%22120%22%20rx%3D%2224%22%20fill%3D%22%23b45309%22%2F%3E%3Ccircle%20cx%3D%2260%22%20cy%3D%2260%22%20r%3D%2236%22%20fill%3D%22%23fbbf24%22%2F%3E%3Ctext%20x%3D%2260%22%20y%3D%2268%22%20font-size%3D%2226%22%20font-family%3D%22sans-serif%22%20font-weight%3D%22bold%22%20text-anchor%3D%22middle%22%20fill%3D%22%231c1917%22%3EGA%3C%2Ftext%3E%3C%2Fsvg%3E",
-    "emoji": "☕",
-    "colorHex": "#d97706",
-    "customFields": {
-      "barcodes": [
-        "200975649002",
-        "6289900320917",
-        "200498860403"
-      ],
-      "priceCurrency": "SDG",
-      "image": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22120%22%20height%3D%22120%22%3E%3Crect%20width%3D%22120%22%20height%3D%22120%22%20rx%3D%2224%22%20fill%3D%22%23b45309%22%2F%3E%3Ccircle%20cx%3D%2260%22%20cy%3D%2260%22%20r%3D%2236%22%20fill%3D%22%23fbbf24%22%2F%3E%3Ctext%20x%3D%2260%22%20y%3D%2268%22%20font-size%3D%2226%22%20font-family%3D%22sans-serif%22%20font-weight%3D%22bold%22%20text-anchor%3D%22middle%22%20fill%3D%22%231c1917%22%3EGA%3C%2Ftext%3E%3C%2Fsvg%3E"
-    },
-    "id": "prod-1793444144037",
-    "isActive": true,
-    "createdAt": "2026-10-31T10:55:44.037Z",
-    "updatedAt": "2026-10-31T10:55:44.037Z"
+    "updatedAt": "2026-11-05T09:18:47.398Z"
   },
   {
-    "name": "Persistent Pastry 1793443926429",
-    "sku": "SKU-PERSIST-1793443926429",
-    "barcode": "444443926429",
-    "category": "Bakery",
-    "costPrice": 1.2,
-    "sellingPrice": 3.5,
-    "stock": 30,
-    "minStockAlert": 5,
-    "id": "prod-1793443926439",
+    "id": "prod-c2rd1-ralmp",
+    "companyId": "comp-c2rd1",
+    "name": "Artisan Arabic Coffee 500g",
+    "nameAr": "قهوة عربية فاخرة 500 جرام",
+    "sku": "COF-500",
+    "barcode": "628100000101",
     "barcodes": [
-      "444443926429"
+      "628100000101",
+      "628100000102"
     ],
-    "priceCurrency": "SDG",
-    "imageUrl": null,
-    "customFields": {
-      "barcodes": [
-        "444443926429"
-      ],
-      "priceCurrency": "SDG"
-    },
-    "isActive": true,
-    "createdAt": "2026-10-31T10:52:06.439Z",
-    "updatedAt": "2026-10-31T10:52:06.439Z"
-  },
-  {
-    "id": "prod-1793443926318",
-    "name": "Post-update Name 1793443926307",
-    "nameAr": null,
-    "sku": "SKU-UPDATE-1793443926307",
-    "barcode": "666443926307",
-    "barcodes": [
-      "666443926307"
-    ],
-    "categoryId": null,
-    "category": "Coffee",
-    "categoryAr": null,
-    "costPrice": 3,
-    "sellingPrice": 8.5,
-    "priceCurrency": "SDG",
-    "stock": 25,
-    "minStockAlert": 2,
-    "imageUrl": null,
-    "emoji": "📦",
-    "colorHex": "#d97706",
-    "baseUomId": "uom-pcs",
-    "defaultSellingUomId": "uom-pcs",
-    "customFields": {
-      "barcodes": [
-        "666443926307"
-      ],
-      "priceCurrency": "SDG"
-    },
-    "isActive": true,
-    "createdAt": "2026-10-31T10:52:06.318Z",
-    "updatedAt": "2026-10-31T10:52:06.350Z"
-  },
-  {
-    "name": "Unique SKU Item",
-    "sku": "SKU-UNIQUE-1793443926266",
-    "barcode": "777443926266",
-    "category": "Bakery",
-    "costPrice": 1.5,
-    "sellingPrice": 4,
-    "stock": 20,
-    "minStockAlert": 5,
-    "id": "prod-1793443926276",
-    "barcodes": [
-      "777443926266"
-    ],
-    "priceCurrency": "SDG",
-    "imageUrl": null,
-    "customFields": {
-      "barcodes": [
-        "777443926266"
-      ],
-      "priceCurrency": "SDG"
-    },
-    "isActive": true,
-    "createdAt": "2026-10-31T10:52:06.276Z",
-    "updatedAt": "2026-10-31T10:52:06.276Z"
-  },
-  {
-    "name": "Original Item A",
-    "sku": "SKU-ORIG-1793443926229",
-    "barcode": "888443926229",
-    "category": "Retail",
-    "costPrice": 5,
-    "sellingPrice": 10,
-    "stock": 15,
-    "minStockAlert": 3,
-    "id": "prod-1793443926240",
-    "barcodes": [
-      "888443926229"
-    ],
-    "priceCurrency": "SDG",
-    "imageUrl": null,
-    "customFields": {
-      "barcodes": [
-        "888443926229"
-      ],
-      "priceCurrency": "SDG"
-    },
-    "isActive": true,
-    "createdAt": "2026-10-31T10:52:06.240Z",
-    "updatedAt": "2026-10-31T10:52:06.240Z"
-  },
-  {
-    "name": "Test Matcha Latte 1793443921615",
-    "nameAr": "ماتشا لاتيه تجريبي 1793443921615",
-    "sku": "SKU-MATCHA-1793443921615",
-    "barcode": "999443921615",
     "category": "Beverages",
     "categoryAr": "مشروبات",
-    "costPrice": 2.1,
-    "sellingPrice": 5.75,
-    "stock": 40,
-    "minStockAlert": 5,
-    "emoji": "🍵",
-    "colorHex": "#10b981",
-    "id": "prod-1793443926186",
-    "barcodes": [
-      "999443921615"
-    ],
+    "costPrice": 4000,
+    "sellingPrice": 5500,
     "priceCurrency": "SDG",
-    "imageUrl": null,
-    "customFields": {
-      "barcodes": [
-        "999443921615"
-      ],
-      "priceCurrency": "SDG"
-    },
-    "isActive": true,
-    "createdAt": "2026-10-31T10:52:06.186Z",
-    "updatedAt": "2026-10-31T10:52:06.186Z"
-  },
-  {
-    "name": "Persistent Pastry 1793438065096",
-    "sku": "SKU-PERSIST-1793438065096",
-    "barcode": "444438065096",
-    "category": "Bakery",
-    "costPrice": 1.2,
-    "sellingPrice": 3.5,
-    "stock": 30,
-    "minStockAlert": 5,
-    "id": "prod-1793438065105",
-    "isActive": true,
-    "createdAt": "2026-10-31T09:14:25.105Z",
-    "updatedAt": "2026-10-31T09:14:25.105Z"
-  },
-  {
-    "id": "prod-1793438065014",
-    "name": "Post-update Name 1793438065006",
-    "nameAr": null,
-    "sku": "SKU-UPDATE-1793438065006",
-    "barcode": "666438065006",
-    "categoryId": null,
-    "category": "Coffee",
-    "categoryAr": null,
-    "costPrice": 3,
-    "sellingPrice": 8.5,
     "stock": 25,
-    "minStockAlert": 2,
-    "emoji": "📦",
-    "colorHex": "#d97706",
-    "baseUomId": "uom-pcs",
-    "defaultSellingUomId": "uom-pcs",
-    "imageUrl": null,
-    "customFields": {},
-    "isActive": true,
-    "createdAt": "2026-10-31T09:14:25.014Z",
-    "updatedAt": "2026-10-31T09:14:25.043Z"
-  },
-  {
-    "name": "Unique SKU Item",
-    "sku": "SKU-UNIQUE-1793438064972",
-    "barcode": "777438064972",
-    "category": "Bakery",
-    "costPrice": 1.5,
-    "sellingPrice": 4,
-    "stock": 20,
     "minStockAlert": 5,
-    "id": "prod-1793438064983",
-    "isActive": true,
-    "createdAt": "2026-10-31T09:14:24.983Z",
-    "updatedAt": "2026-10-31T09:14:24.983Z"
+    "updatedAt": "2026-11-05T09:18:47.398Z"
   },
   {
-    "name": "Original Item A",
-    "sku": "SKU-ORIG-1793438064939",
-    "barcode": "888438064939",
-    "category": "Retail",
-    "costPrice": 5,
-    "sellingPrice": 10,
-    "stock": 15,
-    "minStockAlert": 3,
-    "id": "prod-1793438064949",
-    "isActive": true,
-    "createdAt": "2026-10-31T09:14:24.949Z",
-    "updatedAt": "2026-10-31T09:14:24.949Z"
-  },
-  {
-    "name": "Test Matcha Latte 1793438064813",
-    "nameAr": "ماتشا لاتيه تجريبي 1793438064813",
-    "sku": "SKU-MATCHA-1793438064813",
-    "barcode": "999438064813",
+    "id": "prod-coffee-1",
+    "companyId": "comp-mw3c2r4g-81a4",
+    "name": "Artisan Arabic Coffee 500g",
+    "nameAr": "قهوة عربية فاخرة 500 جرام",
+    "sku": "COF-500",
+    "barcode": "628100000101",
+    "barcodes": [
+      "628100000101",
+      "628100000102"
+    ],
     "category": "Beverages",
     "categoryAr": "مشروبات",
-    "costPrice": 2.1,
-    "sellingPrice": 5.75,
-    "stock": 40,
-    "minStockAlert": 5,
-    "emoji": "🍵",
-    "colorHex": "#10b981",
-    "id": "prod-1793438064909",
-    "isActive": true,
-    "createdAt": "2026-10-31T09:14:24.909Z",
-    "updatedAt": "2026-10-31T09:14:24.909Z"
-  },
-  {
-    "name": "Persistent Pastry 1793437896127",
-    "sku": "SKU-PERSIST-1793437896127",
-    "barcode": "444437896127",
-    "category": "Bakery",
-    "costPrice": 1.2,
-    "sellingPrice": 3.5,
-    "stock": 30,
-    "minStockAlert": 5,
-    "id": "prod-1793437896138",
-    "isActive": true,
-    "createdAt": "2026-10-31T09:11:36.138Z",
-    "updatedAt": "2026-10-31T09:11:36.138Z"
-  },
-  {
-    "id": "prod-1793437896043",
-    "name": "Post-update Name 1793437896033",
-    "nameAr": null,
-    "sku": "SKU-UPDATE-1793437896033",
-    "barcode": "666437896033",
-    "categoryId": null,
-    "category": "Coffee",
-    "categoryAr": null,
-    "costPrice": 3,
-    "sellingPrice": 8.5,
+    "costPrice": 4000,
+    "sellingPrice": 5500,
+    "priceCurrency": "SDG",
     "stock": 25,
-    "minStockAlert": 2,
-    "emoji": "📦",
-    "colorHex": "#d97706",
-    "baseUomId": "uom-pcs",
-    "defaultSellingUomId": "uom-pcs",
-    "imageUrl": null,
-    "customFields": {},
-    "isActive": true,
-    "createdAt": "2026-10-31T09:11:36.043Z",
-    "updatedAt": "2026-10-31T09:11:36.071Z"
-  },
-  {
-    "name": "Unique SKU Item",
-    "sku": "SKU-UNIQUE-1793437896002",
-    "barcode": "777437896002",
-    "category": "Bakery",
-    "costPrice": 1.5,
-    "sellingPrice": 4,
-    "stock": 20,
     "minStockAlert": 5,
-    "id": "prod-1793437896010",
-    "isActive": true,
-    "createdAt": "2026-10-31T09:11:36.010Z",
-    "updatedAt": "2026-10-31T09:11:36.010Z"
+    "updatedAt": "2026-11-05T09:18:47.666Z"
   },
   {
-    "name": "Original Item A",
-    "sku": "SKU-ORIG-1793437895967",
-    "barcode": "888437895967",
-    "category": "Retail",
-    "costPrice": 5,
-    "sellingPrice": 10,
-    "stock": 15,
-    "minStockAlert": 3,
-    "id": "prod-1793437895977",
-    "isActive": true,
-    "createdAt": "2026-10-31T09:11:35.977Z",
-    "updatedAt": "2026-10-31T09:11:35.977Z"
-  },
-  {
-    "name": "Test Matcha Latte 1793437895795",
-    "nameAr": "ماتشا لاتيه تجريبي 1793437895795",
-    "sku": "SKU-MATCHA-1793437895795",
-    "barcode": "999437895795",
+    "id": "prod-coffee-1",
+    "companyId": "comp-mw3cf7a1-d42a",
+    "name": "Artisan Arabic Coffee 500g",
+    "nameAr": "قهوة عربية فاخرة 500 جرام",
+    "sku": "COF-500",
+    "barcode": "628100000101",
+    "barcodes": [
+      "628100000101",
+      "628100000102"
+    ],
     "category": "Beverages",
     "categoryAr": "مشروبات",
-    "costPrice": 2.1,
-    "sellingPrice": 5.75,
-    "stock": 40,
-    "minStockAlert": 5,
-    "emoji": "🍵",
-    "colorHex": "#10b981",
-    "id": "prod-1793437895927",
-    "isActive": true,
-    "createdAt": "2026-10-31T09:11:35.927Z",
-    "updatedAt": "2026-10-31T09:11:35.927Z"
-  },
-  {
-    "name": "Persistent Pastry 1793433354842",
-    "sku": "SKU-PERSIST-1793433354842",
-    "barcode": "444433354842",
-    "category": "Bakery",
-    "costPrice": 1.2,
-    "sellingPrice": 3.5,
-    "stock": 30,
-    "minStockAlert": 5,
-    "id": "prod-1793433354850",
-    "isActive": true,
-    "createdAt": "2026-10-31T07:55:54.850Z",
-    "updatedAt": "2026-10-31T07:55:54.850Z"
-  },
-  {
-    "id": "prod-1793433354749",
-    "name": "Post-update Name 1793433354737",
-    "nameAr": null,
-    "sku": "SKU-UPDATE-1793433354737",
-    "barcode": "666433354737",
-    "categoryId": null,
-    "category": "Coffee",
-    "categoryAr": null,
-    "costPrice": 3,
-    "sellingPrice": 8.5,
+    "costPrice": 4000,
+    "sellingPrice": 5500,
+    "priceCurrency": "SDG",
     "stock": 25,
-    "minStockAlert": 2,
-    "emoji": "📦",
-    "colorHex": "#d97706",
-    "baseUomId": "uom-pcs",
-    "defaultSellingUomId": "uom-pcs",
-    "imageUrl": null,
-    "customFields": {},
-    "isActive": true,
-    "createdAt": "2026-10-31T07:55:54.749Z",
-    "updatedAt": "2026-10-31T07:55:54.783Z"
+    "minStockAlert": 5,
+    "updatedAt": "2026-11-05T09:28:28.331Z"
+  },
+  {
+    "id": "prod-coffee-1",
+    "companyId": "comp-mw3chkmw-d5f8",
+    "name": "Artisan Arabic Coffee 500g",
+    "nameAr": "قهوة عربية فاخرة 500 جرام",
+    "sku": "COF-500",
+    "barcode": "628100000101",
+    "barcodes": [
+      "628100000101",
+      "628100000102"
+    ],
+    "category": "Beverages",
+    "categoryAr": "مشروبات",
+    "costPrice": 4000,
+    "sellingPrice": 5500,
+    "priceCurrency": "SDG",
+    "stock": 25,
+    "minStockAlert": 5,
+    "updatedAt": "2026-11-05T09:30:18.940Z"
+  },
+  {
+    "id": "prod-chky7-4pxfs",
+    "companyId": "comp-chky7",
+    "name": "Artisan Arabic Coffee 500g",
+    "nameAr": "قهوة عربية فاخرة 500 جرام",
+    "sku": "COF-500",
+    "barcode": "628100000101",
+    "barcodes": [
+      "628100000101",
+      "628100000102"
+    ],
+    "category": "Beverages",
+    "categoryAr": "مشروبات",
+    "costPrice": 4000,
+    "sellingPrice": 5500,
+    "priceCurrency": "SDG",
+    "stock": 25,
+    "minStockAlert": 5,
+    "updatedAt": "2026-11-05T09:30:18.940Z"
+  },
+  {
+    "id": "prod-coffee-1",
+    "companyId": "comp-mw3chkqw-c2f8",
+    "name": "Artisan Arabic Coffee 500g",
+    "nameAr": "قهوة عربية فاخرة 500 جرام",
+    "sku": "COF-500",
+    "barcode": "628100000101",
+    "barcodes": [
+      "628100000101",
+      "628100000102"
+    ],
+    "category": "Beverages",
+    "categoryAr": "مشروبات",
+    "costPrice": 4000,
+    "sellingPrice": 5500,
+    "priceCurrency": "SDG",
+    "stock": 25,
+    "minStockAlert": 5,
+    "updatedAt": "2026-11-05T09:30:19.202Z"
+  },
+  {
+    "id": "prod-coffee-1",
+    "companyId": "comp-mw3crgdz-bfaf",
+    "name": "Artisan Arabic Coffee 500g",
+    "nameAr": "قهوة عربية فاخرة 500 جرام",
+    "sku": "COF-500",
+    "barcode": "628100000101",
+    "barcodes": [
+      "628100000101",
+      "628100000102"
+    ],
+    "category": "Beverages",
+    "categoryAr": "مشروبات",
+    "costPrice": 4000,
+    "sellingPrice": 5500,
+    "priceCurrency": "SDG",
+    "stock": 25,
+    "minStockAlert": 5,
+    "updatedAt": "2026-11-05T09:38:00.041Z"
+  },
+  {
+    "id": "prod-crgr9-zzemt",
+    "companyId": "comp-crgr9",
+    "name": "Artisan Arabic Coffee 500g",
+    "nameAr": "قهوة عربية فاخرة 500 جرام",
+    "sku": "COF-500",
+    "barcode": "628100000101",
+    "barcodes": [
+      "628100000101",
+      "628100000102"
+    ],
+    "category": "Beverages",
+    "categoryAr": "مشروبات",
+    "costPrice": 4000,
+    "sellingPrice": 5500,
+    "priceCurrency": "SDG",
+    "stock": 25,
+    "minStockAlert": 5,
+    "updatedAt": "2026-11-05T09:38:00.041Z"
+  },
+  {
+    "id": "prod-coffee-1",
+    "companyId": "comp-mw3crgj4-aad0",
+    "name": "Artisan Arabic Coffee 500g",
+    "nameAr": "قهوة عربية فاخرة 500 جرام",
+    "sku": "COF-500",
+    "barcode": "628100000101",
+    "barcodes": [
+      "628100000101",
+      "628100000102"
+    ],
+    "category": "Beverages",
+    "categoryAr": "مشروبات",
+    "costPrice": 4000,
+    "sellingPrice": 5500,
+    "priceCurrency": "SDG",
+    "stock": 25,
+    "minStockAlert": 5,
+    "updatedAt": "2026-11-05T09:38:00.319Z"
+  },
+  {
+    "id": "prod-coffee-1",
+    "companyId": "comp-mw3cykgr-f427",
+    "name": "Artisan Arabic Coffee 500g",
+    "nameAr": "قهوة عربية فاخرة 500 جرام",
+    "sku": "COF-500",
+    "barcode": "628100000101",
+    "barcodes": [
+      "628100000101",
+      "628100000102"
+    ],
+    "category": "Beverages",
+    "categoryAr": "مشروبات",
+    "costPrice": 4000,
+    "sellingPrice": 5500,
+    "priceCurrency": "SDG",
+    "stock": 25,
+    "minStockAlert": 5,
+    "updatedAt": "2026-11-05T09:43:31.946Z"
+  },
+  {
+    "id": "prod-cykv7-7qehc",
+    "companyId": "comp-cykv7",
+    "name": "Artisan Arabic Coffee 500g",
+    "nameAr": "قهوة عربية فاخرة 500 جرام",
+    "sku": "COF-500",
+    "barcode": "628100000101",
+    "barcodes": [
+      "628100000101",
+      "628100000102"
+    ],
+    "category": "Beverages",
+    "categoryAr": "مشروبات",
+    "costPrice": 4000,
+    "sellingPrice": 5500,
+    "priceCurrency": "SDG",
+    "stock": 25,
+    "minStockAlert": 5,
+    "updatedAt": "2026-11-05T09:43:31.946Z"
+  },
+  {
+    "id": "prod-coffee-1",
+    "companyId": "comp-mw3cykm2-d6e9",
+    "name": "Artisan Arabic Coffee 500g",
+    "nameAr": "قهوة عربية فاخرة 500 جرام",
+    "sku": "COF-500",
+    "barcode": "628100000101",
+    "barcodes": [
+      "628100000101",
+      "628100000102"
+    ],
+    "category": "Beverages",
+    "categoryAr": "مشروبات",
+    "costPrice": 4000,
+    "sellingPrice": 5500,
+    "priceCurrency": "SDG",
+    "stock": 25,
+    "minStockAlert": 5,
+    "updatedAt": "2026-11-05T09:43:32.257Z"
+  },
+  {
+    "id": "prod-coffee-1",
+    "companyId": "comp-mw3dtblk-426d",
+    "name": "Artisan Arabic Coffee 500g",
+    "nameAr": "قهوة عربية فاخرة 500 جرام",
+    "sku": "COF-500",
+    "barcode": "628100000101",
+    "barcodes": [
+      "628100000101",
+      "628100000102"
+    ],
+    "category": "Beverages",
+    "categoryAr": "مشروبات",
+    "costPrice": 4000,
+    "sellingPrice": 5500,
+    "priceCurrency": "SDG",
+    "stock": 25,
+    "minStockAlert": 5,
+    "updatedAt": "2026-11-05T10:07:35.860Z"
+  },
+  {
+    "id": "prod-dtizl-ytuk8",
+    "companyId": "comp-dtizl",
+    "name": "Artisan Arabic Coffee 500g",
+    "nameAr": "قهوة عربية فاخرة 500 جرام",
+    "sku": "COF-500",
+    "barcode": "628100000101",
+    "barcodes": [
+      "628100000101",
+      "628100000102"
+    ],
+    "category": "Beverages",
+    "categoryAr": "مشروبات",
+    "costPrice": 4000,
+    "sellingPrice": 5500,
+    "priceCurrency": "SDG",
+    "stock": 25,
+    "minStockAlert": 5,
+    "updatedAt": "2026-11-05T10:07:35.860Z"
+  },
+  {
+    "id": "prod-coffee-1",
+    "companyId": "comp-mw3dtiq4-c61e",
+    "name": "Artisan Arabic Coffee 500g",
+    "nameAr": "قهوة عربية فاخرة 500 جرام",
+    "sku": "COF-500",
+    "barcode": "628100000101",
+    "barcodes": [
+      "628100000101",
+      "628100000102"
+    ],
+    "category": "Beverages",
+    "categoryAr": "مشروبات",
+    "costPrice": 4000,
+    "sellingPrice": 5500,
+    "priceCurrency": "SDG",
+    "stock": 25,
+    "minStockAlert": 5,
+    "updatedAt": "2026-11-05T10:07:36.152Z"
   }
 ]

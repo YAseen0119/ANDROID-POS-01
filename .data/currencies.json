@@ -1,0 +1,20 @@
+[
+  {
+    "code": "SDG",
+    "name": "Sudanese Pound",
+    "nameAr": "جنيه سوداني",
+    "symbol": "ج.س",
+    "decimalPlaces": 2,
+    "isBase": true,
+    "isActive": true
+  },
+  {
+    "code": "SAR",
+    "name": "Saudi Riyal",
+    "nameAr": "ريال سعودي",
+    "symbol": "ر.س",
+    "decimalPlaces": 2,
+    "isBase": false,
+    "isActive": true
+  }
+]

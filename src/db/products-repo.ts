@@ -9,12 +9,23 @@ import { eq, and, or, ilike, desc } from 'drizzle-orm';
 import fs from 'fs';
 import path from 'path';
 import { INITIAL_PRODUCTS } from '../lib/initial-data.ts';
-import { normalizeProductBarcodes, matchesProductBarcode } from '../lib/inventory-rules.ts';
+import {
+  normalizeProductBarcodes,
+  matchesProductBarcode,
+  matchesProductSearchQuery,
+  getProductSerialNumber,
+  getNextProductSerialNumber,
+  buildProductAuditTrail,
+} from '../lib/inventory-rules.ts';
+import { ProductModificationEntry, ProductPriceHistoryEntry } from '../lib/types.ts';
 
 export interface ProductRecord {
   id: string;
+  serialNumber?: number;
   name: string;
   nameAr?: string | null;
+  description?: string | null;
+  descriptionAr?: string | null;
   sku: string;
   barcode: string;
   barcodes?: string[];
@@ -23,6 +34,11 @@ export interface ProductRecord {
   categoryAr?: string | null;
   costPrice: number;
   sellingPrice: number;
+  previousCostPrice?: number;
+  previousSellingPrice?: number;
+  priceUpdatedAt?: string;
+  priceHistory?: ProductPriceHistoryEntry[];
+  modificationHistory?: ProductModificationEntry[];
   priceCurrency?: string;
   stock: number;
   minStockAlert: number;
@@ -42,44 +58,37 @@ export interface ProductRecord {
 const DATA_DIR = path.resolve('.data');
 const DATA_FILE = path.join(DATA_DIR, 'products.json');
 
+const DEMO_SEED_PRODUCT_IDS = new Set([
+  'prod-1',
+  'prod-2',
+  'prod-3',
+  'prod-4',
+  'prod-5',
+  'prod-6',
+  'prod-7',
+  'prod-8',
+  'prod-9',
+  'prod-10',
+]);
+
 function ensureDataFile(): ProductRecord[] {
   try {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
     if (!fs.existsSync(DATA_FILE)) {
-      const initial: ProductRecord[] = INITIAL_PRODUCTS.map((p) => ({
-        id: p.id,
-        name: p.name,
-        nameAr: p.nameAr || null,
-        sku: p.sku,
-        barcode: p.barcode,
-        barcodes: normalizeProductBarcodes(p.barcode, p.barcodes),
-        categoryId: null,
-        category: p.category,
-        categoryAr: p.categoryAr || null,
-        costPrice: p.costPrice,
-        sellingPrice: p.sellingPrice,
-        priceCurrency: p.priceCurrency || 'SDG',
-        stock: p.stock,
-        minStockAlert: p.minStockAlert,
-        image: p.image,
-        imageUrl: p.image || p.imageUrl || null,
-        emoji: p.emoji || '📦',
-        colorHex: p.colorHex || '#d97706',
-        customFields: {
-          barcodes: normalizeProductBarcodes(p.barcode, p.barcodes),
-          priceCurrency: p.priceCurrency || 'SDG',
-        },
-        isActive: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: p.updatedAt || new Date().toISOString(),
-      }));
+      const initial: ProductRecord[] = [];
       fs.writeFileSync(DATA_FILE, JSON.stringify(initial, null, 2), 'utf-8');
       return initial;
     }
     const content = fs.readFileSync(DATA_FILE, 'utf-8');
-    return JSON.parse(content);
+    const parsed = JSON.parse(content);
+    if (!Array.isArray(parsed)) return [];
+    const cleaned = parsed.filter((p: any) => p && !DEMO_SEED_PRODUCT_IDS.has(String(p.id)));
+    if (cleaned.length !== parsed.length) {
+      fs.writeFileSync(DATA_FILE, JSON.stringify(cleaned, null, 2), 'utf-8');
+    }
+    return cleaned;
   } catch (err) {
     console.error('Error reading fallback products file:', err);
     return [];
@@ -97,24 +106,44 @@ function writeDataFile(items: ProductRecord[]) {
   }
 }
 
-function hydrateProductRecord(raw: any): ProductRecord {
+function hydrateProductRecord(raw: any, fallbackIdx?: number): ProductRecord {
   const cf = (raw.customFields && typeof raw.customFields === 'object' ? raw.customFields : {}) as Record<string, any>;
   const barcodes = normalizeProductBarcodes(raw.barcode, raw.barcodes || cf.barcodes);
   const priceCurrency = (raw.priceCurrency || cf.priceCurrency || 'SDG').toString().toUpperCase();
   const resolvedImage = raw.image || raw.imageUrl || cf.image || undefined;
+  const serialNumber = getProductSerialNumber(raw, fallbackIdx);
+  const description = raw.description ?? cf.description ?? null;
+  const descriptionAr = raw.descriptionAr ?? cf.descriptionAr ?? null;
+  const previousCostPrice = raw.previousCostPrice ?? cf.previousCostPrice;
+  const previousSellingPrice = raw.previousSellingPrice ?? cf.previousSellingPrice;
+  const priceUpdatedAt = raw.priceUpdatedAt ?? cf.priceUpdatedAt;
+  const priceHistory = raw.priceHistory || cf.priceHistory || [];
+  const modificationHistory = raw.modificationHistory || cf.modificationHistory || [];
+  const createdAtStr =
+    raw.createdAt instanceof Date
+      ? raw.createdAt.toISOString()
+      : String(raw.createdAt || cf.createdAt || new Date().toISOString());
 
   return {
     id: raw.id,
+    serialNumber,
     name: raw.name,
     nameAr: raw.nameAr ?? null,
+    description,
+    descriptionAr,
     sku: raw.sku,
-    barcode: raw.barcode,
+    barcode: raw.barcode ?? '',
     barcodes,
     categoryId: raw.categoryId ?? null,
     category: raw.category ?? raw.categoryName ?? 'General',
     categoryAr: raw.categoryAr ?? raw.categoryNameAr ?? null,
     costPrice: typeof raw.costPrice === 'number' ? raw.costPrice : parseFloat(raw.costPrice || '0'),
     sellingPrice: typeof raw.sellingPrice === 'number' ? raw.sellingPrice : parseFloat(raw.sellingPrice || '0'),
+    previousCostPrice: previousCostPrice !== undefined ? Number(previousCostPrice) : undefined,
+    previousSellingPrice: previousSellingPrice !== undefined ? Number(previousSellingPrice) : undefined,
+    priceUpdatedAt,
+    priceHistory,
+    modificationHistory,
     priceCurrency,
     stock: Number(raw.stock) || 0,
     minStockAlert: Number(raw.minStockAlert) || 0,
@@ -126,12 +155,21 @@ function hydrateProductRecord(raw: any): ProductRecord {
     defaultSellingUomId: raw.defaultSellingUomId ?? null,
     customFields: {
       ...cf,
+      serialNumber,
+      description,
+      descriptionAr,
       barcodes,
       priceCurrency,
+      createdAt: createdAtStr,
+      previousCostPrice,
+      previousSellingPrice,
+      priceUpdatedAt,
+      priceHistory,
+      modificationHistory,
       ...(resolvedImage ? { image: resolvedImage } : {}),
     },
     isActive: raw.isActive !== undefined ? Boolean(raw.isActive) : true,
-    createdAt: raw.createdAt instanceof Date ? raw.createdAt.toISOString() : String(raw.createdAt || new Date().toISOString()),
+    createdAt: createdAtStr,
     updatedAt: raw.updatedAt instanceof Date ? raw.updatedAt.toISOString() : String(raw.updatedAt || new Date().toISOString()),
   };
 }
@@ -149,16 +187,16 @@ export async function getAllProducts(query?: string, category?: string): Promise
         const seenBarcodes = new Set<string>();
         for (const item of fileItems) {
           const skuLower = item.sku.toLowerCase();
-          if (!seenSkus.has(skuLower) && !seenBarcodes.has(item.barcode)) {
+          if (!seenSkus.has(skuLower) && (!item.barcode || !seenBarcodes.has(item.barcode))) {
             seenSkus.add(skuLower);
-            seenBarcodes.add(item.barcode);
+            if (item.barcode) seenBarcodes.add(item.barcode);
             try {
               await db.insert(products).values({
                 id: item.id,
                 name: item.name,
                 nameAr: item.nameAr || null,
                 sku: item.sku,
-                barcode: item.barcode,
+                barcode: item.barcode || '',
                 categoryName: item.category,
                 categoryNameAr: item.categoryAr || null,
                 costPrice: item.costPrice.toFixed(2),
@@ -180,19 +218,19 @@ export async function getAllProducts(query?: string, category?: string): Promise
         }
         const refreshed = await db.select().from(products).orderBy(desc(products.updatedAt));
         if (refreshed.length > 0) {
-          const mappedRefreshed: ProductRecord[] = refreshed.map((p) => hydrateProductRecord(p));
+          const mappedRefreshed: ProductRecord[] = refreshed.map((p, idx) => hydrateProductRecord(p, idx));
           return filterProductList(mappedRefreshed, query, category);
         }
       }
 
-      const mapped: ProductRecord[] = dbProducts.map((p) => hydrateProductRecord(p));
+      const mapped: ProductRecord[] = dbProducts.map((p, idx) => hydrateProductRecord(p, idx));
       return filterProductList(mapped, query, category);
     } catch (err) {
       console.warn('PostgreSQL query failed, falling back to durable file store:', err);
     }
   }
 
-  const items = ensureDataFile().map((p) => hydrateProductRecord(p));
+  const items = ensureDataFile().map((p, idx) => hydrateProductRecord(p, idx));
   return filterProductList(items, query, category);
 }
 
@@ -201,15 +239,9 @@ function filterProductList(
   query?: string,
   category?: string
 ): ProductRecord[] {
-  return items.filter((p) => {
+  return items.filter((p, idx) => {
     if (!p.isActive) return false;
-    const matchesSearch =
-      !query ||
-      p.name.toLowerCase().includes(query.toLowerCase()) ||
-      (p.nameAr && p.nameAr.includes(query)) ||
-      p.sku.toLowerCase().includes(query.toLowerCase()) ||
-      matchesProductBarcode(p, query, false);
-
+    const matchesSearch = !query || matchesProductSearchQuery(p as any, query, idx);
     const matchesCat = !category || category === 'all' || p.category === category;
     return matchesSearch && matchesCat;
   });
@@ -231,22 +263,23 @@ export async function getProductById(id: string): Promise<ProductRecord | null> 
     }
   }
 
-  const items = ensureDataFile().map((p) => hydrateProductRecord(p));
+  const items = ensureDataFile().map((p, idx) => hydrateProductRecord(p, idx));
   return items.find((p) => p.id === id && p.isActive) || null;
 }
 
 /**
- * Create a new product with uniqueness validation on SKU and all Barcodes.
+ * Create a new product with uniqueness validation on SKU and all non-empty Barcodes.
  */
 export async function createProduct(
   data: Omit<ProductRecord, 'id' | 'createdAt' | 'updatedAt' | 'isActive'>
 ): Promise<ProductRecord> {
   const currentItems = await getAllProducts();
   const normalizedBarcodes = normalizeProductBarcodes(data.barcode, data.barcodes);
-  const primaryBarcode = normalizedBarcodes[0] || data.barcode;
+  const primaryBarcode = normalizedBarcodes[0] || (data.barcode || '').trim();
 
-  // Validate Barcode Uniqueness across all primary and secondary barcodes
+  // Validate Barcode Uniqueness across all non-empty primary and secondary barcodes
   for (const candidateCode of normalizedBarcodes) {
+    if (!candidateCode) continue;
     const conflict = currentItems.find((p) => matchesProductBarcode(p, candidateCode, true));
     if (conflict) {
       throw new Error(
@@ -261,24 +294,66 @@ export async function createProduct(
 
   const now = new Date().toISOString();
   const newId = `prod-${Date.now()}`;
+  const serialNumber =
+    data.serialNumber && Number(data.serialNumber) > 0
+      ? Math.floor(Number(data.serialNumber))
+      : getNextProductSerialNumber(currentItems);
   const resolvedImage = data.image || data.imageUrl || (data.customFields as any)?.image || undefined;
   const resolvedCurrency = (data.priceCurrency || (data.customFields as any)?.priceCurrency || 'SDG')
     .toString()
     .toUpperCase();
 
+  const audit = buildProductAuditTrail({
+    existingProduct: null,
+    nextProduct: {
+      name: data.name,
+      nameAr: data.nameAr || undefined,
+      description: data.description || undefined,
+      descriptionAr: data.descriptionAr || undefined,
+      sku: data.sku,
+      barcode: normalizedBarcodes[0] || '',
+      barcodes: normalizedBarcodes,
+      category: data.category,
+      categoryAr: data.categoryAr || undefined,
+      costPrice: data.costPrice,
+      sellingPrice: data.sellingPrice,
+      priceCurrency: resolvedCurrency as any,
+      stock: data.stock,
+      minStockAlert: data.minStockAlert,
+    },
+    changedBy: (data.customFields as any)?.changedBy || 'Main Terminal',
+    nowIso: now,
+  });
+
   const mergedCustomFields: Record<string, any> = {
     ...(data.customFields || {}),
+    serialNumber,
+    description: data.description || (data.customFields as any)?.description || null,
+    descriptionAr: data.descriptionAr || (data.customFields as any)?.descriptionAr || null,
     barcodes: normalizedBarcodes,
     priceCurrency: resolvedCurrency,
+    createdAt: now,
+    priceUpdatedAt: audit.priceUpdatedAt,
+    priceHistory: data.priceHistory && data.priceHistory.length > 0 ? data.priceHistory : audit.priceHistory,
+    modificationHistory:
+      data.modificationHistory && data.modificationHistory.length > 0
+        ? data.modificationHistory
+        : audit.modificationHistory,
     ...(resolvedImage ? { image: resolvedImage } : {}),
   };
 
   const record: ProductRecord = {
     ...data,
     id: newId,
+    serialNumber,
+    description: mergedCustomFields.description,
+    descriptionAr: mergedCustomFields.descriptionAr,
     barcode: primaryBarcode,
     barcodes: normalizedBarcodes,
     priceCurrency: resolvedCurrency,
+    priceUpdatedAt: audit.priceUpdatedAt,
+    priceHistory: mergedCustomFields.priceHistory,
+    modificationHistory: mergedCustomFields.modificationHistory,
     image: resolvedImage,
     imageUrl: resolvedImage || null,
     customFields: mergedCustomFields,
@@ -407,11 +482,62 @@ export async function updateProduct(
     .toString()
     .toUpperCase();
 
+  const now = new Date().toISOString();
+  const audit = buildProductAuditTrail({
+    existingProduct: existing as any,
+    nextProduct: {
+      ...(updates as any),
+      barcode: nextBarcodes[0] || nextPrimaryBarcode || '',
+      barcodes: nextBarcodes,
+      priceCurrency: resolvedCurrency as any,
+    },
+    changedBy: (updates.customFields as any)?.changedBy || 'Main Terminal',
+    nowIso: now,
+  });
+
+  const nextSerial =
+    updates.serialNumber !== undefined
+      ? Number(updates.serialNumber)
+      : existing.serialNumber ?? getProductSerialNumber(existing);
+  const nextDesc =
+    updates.description !== undefined
+      ? updates.description
+      : existing.description ?? existing.customFields?.description ?? null;
+  const nextDescAr =
+    updates.descriptionAr !== undefined
+      ? updates.descriptionAr
+      : existing.descriptionAr ?? existing.customFields?.descriptionAr ?? null;
+
+  const finalPriceHistory =
+    updates.priceHistory && updates.priceHistory.length > 0
+      ? updates.priceHistory
+      : audit.priceHistory;
+  const finalModHistory =
+    updates.modificationHistory && updates.modificationHistory.length > 0
+      ? updates.modificationHistory
+      : audit.modificationHistory;
+  const finalPrevCost =
+    updates.previousCostPrice !== undefined ? updates.previousCostPrice : audit.previousCostPrice;
+  const finalPrevSell =
+    updates.previousSellingPrice !== undefined
+      ? updates.previousSellingPrice
+      : audit.previousSellingPrice;
+  const finalPriceUpdatedAt =
+    updates.priceUpdatedAt !== undefined ? updates.priceUpdatedAt : audit.priceUpdatedAt;
+
   const mergedCustomFields: Record<string, any> = {
     ...(existing.customFields || {}),
     ...(updates.customFields || {}),
+    serialNumber: nextSerial,
+    description: nextDesc,
+    descriptionAr: nextDescAr,
     barcodes: nextBarcodes,
     priceCurrency: resolvedCurrency,
+    previousCostPrice: finalPrevCost,
+    previousSellingPrice: finalPrevSell,
+    priceUpdatedAt: finalPriceUpdatedAt,
+    priceHistory: finalPriceHistory,
+    modificationHistory: finalModHistory,
   };
   if (resolvedImage) {
     mergedCustomFields.image = resolvedImage;
@@ -419,13 +545,20 @@ export async function updateProduct(
     delete mergedCustomFields.image;
   }
 
-  const now = new Date().toISOString();
   const updatedRecord: ProductRecord = {
     ...existing,
     ...updates,
-    barcode: nextBarcodes[0] || nextPrimaryBarcode,
+    serialNumber: nextSerial,
+    description: nextDesc,
+    descriptionAr: nextDescAr,
+    barcode: nextBarcodes[0] || nextPrimaryBarcode || '',
     barcodes: nextBarcodes,
     priceCurrency: resolvedCurrency,
+    previousCostPrice: finalPrevCost,
+    previousSellingPrice: finalPrevSell,
+    priceUpdatedAt: finalPriceUpdatedAt,
+    priceHistory: finalPriceHistory,
+    modificationHistory: finalModHistory,
     image: resolvedImage,
     imageUrl: resolvedImage || null,
     customFields: mergedCustomFields,

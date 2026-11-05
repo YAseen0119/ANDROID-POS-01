@@ -1,0 +1,76 @@
+name: Build Android APK (Dqnamo POS)
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    name: Build & Publish Dqnamo POS APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Setup Java JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Build Web Application (Vite)
+        run: npm run build
+
+      - name: Sync Web Bundle to Capacitor Android
+        run: npx cap sync android
+
+      - name: Grant Execute Permission for Gradlew
+        working-directory: ./android
+        run: chmod +x gradlew
+
+      - name: Build Debug APK
+        working-directory: ./android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Rename APK for Direct Download
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk Dqnamo-POS.apk
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Dqnamo-POS-APK
+          path: Dqnamo-POS.apk
+          retention-days: 90
+
+      - name: Publish Direct Download Release (Latest)
+        uses: softprops/action-gh-release@v2
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        with:
+          tag_name: latest-apk
+          name: "Dqnamo POS Android APK (Latest Build)"
+          body: |
+            ### Dqnamo POS — نسخة أندرويد الجاهزة للتثبيت (`.apk`)
+            قم بتحميل الملف **`Dqnamo-POS.apk`** أدناه وتثبيته مباشرة على جهاز الأندرويد.
+          files: Dqnamo-POS.apk
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

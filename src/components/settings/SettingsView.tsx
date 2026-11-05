@@ -25,39 +25,63 @@ import {
   RefreshCw,
   Database,
   CheckCircle,
+  AlertTriangle,
+  ShieldAlert,
+  Lock,
+  Trash2,
+  X,
 } from 'lucide-react';
 import { playTactileClick } from '../../lib/sound-fx';
 import { ExchangeRateSettings } from './ExchangeRateSettings';
+import { UsersPermissionsSection } from './UsersPermissionsSection';
+import { TrainingCenterSection } from './TrainingCenterSection';
+import { BackupRestoreCenterSection } from './BackupRestoreCenterSection';
 
 export const SettingsView: React.FC = () => {
   const {
     settings,
     currencies: contextCurrencies,
+    currentCompany,
+    currentUser,
+    workspaceMode,
     updateSettings,
     resetAllData,
+    executeAuthorizedFactoryReset,
     syncTransactions,
     isSyncing,
     lastSyncedAt,
   } = usePOS();
   const t = getTranslation(settings.language);
+  const isAr = settings.language === 'ar';
 
   const [availableCurrencies, setAvailableCurrencies] = useState<string[]>(() =>
     contextCurrencies && contextCurrencies.length > 0
       ? contextCurrencies.map((c) => c.code)
-      : ['SDG', 'USD', 'SAR', 'AED', 'EUR', 'GBP']
+      : []
   );
 
   React.useEffect(() => {
-    if (contextCurrencies && contextCurrencies.length > 0) {
-      setAvailableCurrencies(contextCurrencies.map((c) => c.code));
-    }
+    setAvailableCurrencies(
+      contextCurrencies && contextCurrencies.length > 0
+        ? contextCurrencies.map((c) => c.code)
+        : []
+    );
   }, [contextCurrencies]);
 
   const handleCurrenciesUpdated = useCallback((currList: Currency[]) => {
-    if (currList && currList.length > 0) {
-      setAvailableCurrencies(currList.map((c) => c.code));
-    }
+    setAvailableCurrencies(currList && currList.length > 0 ? currList.map((c) => c.code) : []);
   }, []);
+
+  // Authorized Factory Reset Modal state (Part 8: Two Reset Scopes)
+  const [isFactoryResetModalOpen, setIsFactoryResetModalOpen] = useState(false);
+  const [factoryResetScope, setFactoryResetScope] = useState<
+    'LOCAL_DEVICE_RESET' | 'COMPANY_FACTORY_RESET'
+  >('LOCAL_DEVICE_RESET');
+  const [confirmCompanyNameInput, setConfirmCompanyNameInput] = useState('');
+  const [ownerPasswordInput, setOwnerPasswordInput] = useState('');
+  const [resetReasonInput, setResetReasonInput] = useState('');
+  const [factoryResetError, setFactoryResetError] = useState<string | null>(null);
+  const [isExecutingReset, setIsExecutingReset] = useState(false);
 
   // Store form state
   const [storeName, setStoreName] = useState(settings.storeName);
@@ -136,9 +160,18 @@ export const SettingsView: React.FC = () => {
           {t.systemSettings}
         </h2>
         <span className="text-xs text-neutral-400">
-          Hardware preferences, localization, tax policies and sync state
+          Hardware preferences, multi-user permissions, localization, tax policies and sync state
         </span>
       </div>
+
+      {/* Interactive Training Tour & Onboarding Center */}
+      <TrainingCenterSection />
+
+      {/* Multi-User Role Permissions & Concurrent Active Sessions */}
+      <UsersPermissionsSection />
+
+      {/* Enterprise Backup, Restore, Company Migration & Intelligent Data Merge Center */}
+      <BackupRestoreCenterSection />
 
       {/* Language & Appearance */}
       <AppCard>
@@ -191,25 +224,33 @@ export const SettingsView: React.FC = () => {
               <Coins className="w-3.5 h-3.5 text-neutral-400" />
               <span>{t.currency}</span>
             </label>
-            <div className="flex flex-wrap gap-1.5">
-              {availableCurrencies.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => {
-                    playTactileClick(settings.soundEnabled);
-                    updateSettings({ currency: c });
-                  }}
-                  className={`py-2 px-3 rounded-xl border text-xs font-mono font-bold transition-all ${
-                    settings.currency === c
-                      ? 'bg-amber-500 text-neutral-950 border-amber-400'
-                      : 'bg-neutral-850 border-neutral-750 text-neutral-400 hover:text-white'
-                  }`}
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
+            {availableCurrencies.length === 0 ? (
+              <div className="p-2.5 rounded-xl bg-neutral-900/70 border border-dashed border-neutral-700 text-[11px] text-neutral-400">
+                {isAr
+                  ? 'لم يتم إضافة أي عملات بعد — قم بإضافة عملاتك المخصصة من قسم العملات وأسعار الصرف أدناه.'
+                  : 'No currencies added yet — add your custom currencies in the Exchange Rates section below.'}
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {availableCurrencies.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => {
+                      playTactileClick(settings.soundEnabled);
+                      updateSettings({ currency: c });
+                    }}
+                    className={`py-2 px-3 rounded-xl border text-xs font-mono font-bold transition-all ${
+                      settings.currency === c
+                        ? 'bg-amber-500 text-neutral-950 border-amber-400'
+                        : 'bg-neutral-850 border-neutral-750 text-neutral-400 hover:text-white'
+                    }`}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Sound & Haptic Feedback Toggles */}
@@ -460,25 +501,322 @@ export const SettingsView: React.FC = () => {
           </TactileButton>
         </div>
 
-        {/* Factory Reset Safety Zone */}
+        {/* Factory Reset Safety Zone (Part 8: Two-Scope Authorized Reset Workflow) */}
         <div className="mt-5 pt-4 border-t border-neutral-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <span className="text-xs font-bold text-rose-400 block">Factory Reset</span>
+            <span className="text-xs font-bold text-rose-400 block">
+              {isAr
+                ? 'إعادة ضبط المصنع وإدارة تصفير البيانات (Factory Reset)'
+                : 'Authorized Factory Reset & Zero-Default-Data Wipe'}
+            </span>
             <span className="text-[11px] text-neutral-500">
-              Clear all sales, custom products, customers and restore initial seeds
+              {isAr
+                ? 'اختر بين مسح بيانات هذا الجهاز محلياً أو إعادة ضبط الشركة بالكامل بدون أي بيانات افتراضية'
+                : 'Choose between Local Device Reset or Authorized Company Factory Reset (zero default data)'}
             </span>
           </div>
 
-          <HoldToConfirm
-            onConfirm={resetAllData}
-            label={t.resetData}
-            confirmingLabel="Erasing data..."
-            confirmedLabel="Reset Complete"
-            variant="danger"
-            className="w-full sm:w-auto text-xs min-h-[38px]"
-          />
+          <div className="flex items-center gap-2 flex-wrap">
+            <TactileButton
+              type="button"
+              variant="danger"
+              size="sm"
+              data-testid="open-factory-reset-modal-btn"
+              onClick={() => {
+                setFactoryResetError(null);
+                setConfirmCompanyNameInput('');
+                setOwnerPasswordInput('');
+                setResetReasonInput('');
+                setFactoryResetScope('LOCAL_DEVICE_RESET');
+                setIsFactoryResetModalOpen(true);
+              }}
+              leftIcon={<ShieldAlert className="w-3.5 h-3.5" />}
+            >
+              {isAr ? 'خيارات إعادة الضبط المعتمدة' : 'Authorized Factory Reset'}
+            </TactileButton>
+
+            <HoldToConfirm
+              onConfirm={resetAllData}
+              label={isAr ? 'مسح محلي سريع' : t.resetData}
+              confirmingLabel={isAr ? 'جاري المسح...' : 'Erasing data...'}
+              confirmedLabel={isAr ? 'تم المسح' : 'Reset Complete'}
+              variant="danger"
+              className="w-full sm:w-auto text-xs min-h-[38px]"
+            />
+          </div>
         </div>
       </AppCard>
+
+      {/* Part 8: Authorized Two-Scope Factory Reset Modal */}
+      {isFactoryResetModalOpen && (
+        <div
+          data-testid="factory-reset-modal"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto"
+        >
+          <div className="w-full max-w-xl bg-neutral-900 border border-rose-500/40 rounded-2xl shadow-2xl overflow-hidden my-auto">
+            {/* Modal Header */}
+            <div className="px-5 py-4 bg-neutral-950 border-b border-neutral-800 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400">
+                  <ShieldAlert className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-black text-white">
+                    {isAr
+                      ? 'بوابة إعادة ضبط المصنع المعتمدة (بدون بيانات افتراضية)'
+                      : 'Authorized Factory Reset (Zero Default Business Data)'}
+                  </h3>
+                  <p className="text-[11px] text-neutral-400">
+                    {isAr
+                      ? 'لن يتم توليد أي منتجات أو عملات أو حسابات افتراضية بعد إعادة الضبط'
+                      : 'No sample products, currencies, or fictional accounts will be created after reset'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                data-testid="factory-reset-close-btn"
+                onClick={() => setIsFactoryResetModalOpen(false)}
+                className="p-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-neutral-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {factoryResetError && (
+                <div
+                  data-testid="factory-reset-error-banner"
+                  className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-300 text-xs font-bold flex items-center gap-2"
+                >
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
+                  <span>{factoryResetError}</span>
+                </div>
+              )}
+
+              {/* Two Reset Scopes Selector */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  data-testid="reset-scope-local-btn"
+                  onClick={() => {
+                    setFactoryResetScope('LOCAL_DEVICE_RESET');
+                    setFactoryResetError(null);
+                  }}
+                  className={`p-3.5 rounded-xl border text-start transition-all ${
+                    factoryResetScope === 'LOCAL_DEVICE_RESET'
+                      ? 'bg-amber-500/15 border-amber-500 text-amber-200'
+                      : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-neutral-200'
+                  }`}
+                >
+                  <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 block mb-1">
+                    {isAr ? 'النطاق أ — الجهاز المحلي فقط' : 'SCOPE A — LOCAL DEVICE RESET'}
+                  </span>
+                  <span className="text-xs font-bold text-white block">
+                    {isAr ? 'مسح حالة الجهاز المحلي فقط' : 'Local Device Reset Only'}
+                  </span>
+                  <span className="text-[11px] text-neutral-400 mt-1 block">
+                    {isAr
+                      ? 'يمسح الكاش المحلي وبيانات المتصفح دون حذف سجلات الشركة على الخادم.'
+                      : 'Clears local cached data and local session without deleting server-side company records.'}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  data-testid="reset-scope-company-btn"
+                  onClick={() => {
+                    setFactoryResetScope('COMPANY_FACTORY_RESET');
+                    setFactoryResetError(null);
+                  }}
+                  className={`p-3.5 rounded-xl border text-start transition-all ${
+                    factoryResetScope === 'COMPANY_FACTORY_RESET'
+                      ? 'bg-rose-500/15 border-rose-500 text-rose-200'
+                      : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-neutral-200'
+                  }`}
+                >
+                  <span className="text-[10px] font-black uppercase tracking-wider text-rose-400 block mb-1">
+                    {isAr ? 'النطاق ب — إعادة ضبط الشركة بالكامل' : 'SCOPE B — COMPANY FACTORY RESET'}
+                  </span>
+                  <span className="text-xs font-bold text-white block">
+                    {isAr ? 'تصفير الشركة بالكامل وإلغاء الجلسات' : 'Full Company Workspace Reset'}
+                  </span>
+                  <span className="text-[11px] text-neutral-400 mt-1 block">
+                    {isAr
+                      ? 'يحذف بيانات الشركة المحددة فقط ويعيدها إلى شاشة التأسيس النظيفة مع حفظ سجل التدقيق.'
+                      : 'Wipes selected company data, revokes sessions, preserves audit logs & other companies.'}
+                  </span>
+                </button>
+              </div>
+
+              {/* Explicit Warning: What will be deleted vs What will be preserved */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/25 space-y-1.5">
+                  <span className="font-black text-rose-300 block">
+                    {isAr ? 'ما الذي سيتم حذفه:' : 'What Will Be Deleted:'}
+                  </span>
+                  <ul className="space-y-1 text-[11px] text-neutral-300 list-disc list-inside">
+                    {factoryResetScope === 'LOCAL_DEVICE_RESET' ? (
+                      <>
+                        <li>{isAr ? 'المنتجات والفواتير المخزنة محلياً في هذا الجهاز' : 'Local cached products, sales & cart on this device'}</li>
+                        <li>{isAr ? 'العملات وأسعار الصرف المحفوظة محلياً' : 'Local cached currencies & exchange rates'}</li>
+                        <li>{isAr ? 'جلسة العمل المحلية الحالية' : 'Current local device session state'}</li>
+                      </>
+                    ) : (
+                      <>
+                        <li>{isAr ? 'جميع المنتجات والعملاء والفواتير وحركات المخزون للشركة الحالية' : 'All products, customers, sales & stock movements for this company'}</li>
+                        <li>{isAr ? 'جميع العملات وأسعار الصرف والحسابات المضافة في هذه الشركة' : 'All company currencies, exchange rates & employee accounts'}</li>
+                        <li>{isAr ? 'إلغاء جميع الجلسات النشطة وإعادة التوجيه لشاشة التأسيس' : 'All active company sessions (revoked immediately)'}</li>
+                      </>
+                    )}
+                  </ul>
+                </div>
+
+                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 space-y-1.5">
+                  <span className="font-black text-emerald-300 block">
+                    {isAr ? 'ما الذي سيتم الحفاظ عليه:' : 'What Will Be Preserved:'}
+                  </span>
+                  <ul className="space-y-1 text-[11px] text-neutral-300 list-disc list-inside">
+                    {factoryResetScope === 'LOCAL_DEVICE_RESET' ? (
+                      <>
+                        <li>{isAr ? 'حساب الشركة وسجلات الخادم' : 'Server-side company records & accounts'}</li>
+                        <li>{isAr ? 'الشركات الأخرى وبيئة التدريب المعزولة' : 'Other companies & isolated Practice Mode'}</li>
+                        <li>{isAr ? 'عدم إضافة أي بيانات افتراضية (0 منتجات / 0 عملات)' : 'Zero default business data injected (0 products / 0 currencies)'}</li>
+                      </>
+                    ) : (
+                      <>
+                        <li>{isAr ? 'سجلات التدقيق والامتثال الأمني (Audit Logs)' : 'Immutable compliance & security audit trail records'}</li>
+                        <li>{isAr ? 'جميع الشركات الأخرى المستقلة وبياناتها' : 'All other tenant companies & isolated Practice Mode'}</li>
+                        <li>{isAr ? 'عودة نظيفة 100% بدون أي بيانات افتراضية' : '100% clean onboarding state with zero default records'}</li>
+                      </>
+                    )}
+                  </ul>
+                </div>
+              </div>
+
+              {/* Scope B Verification Inputs: Exact Company Name + Owner Password/PIN */}
+              {factoryResetScope === 'COMPANY_FACTORY_RESET' && (
+                <div className="p-3.5 rounded-xl bg-neutral-950 border border-rose-500/30 space-y-3">
+                  <div className="flex items-center gap-2 text-xs font-bold text-rose-300">
+                    <Lock className="w-4 h-4 shrink-0" />
+                    <span>
+                      {isAr
+                        ? `تأكيد مصادقة المالك لإعادة ضبط الشركة (${currentCompany.displayName || currentCompany.legalName})`
+                        : `Owner Re-Authentication Required for (${currentCompany.displayName || currentCompany.legalName})`}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-neutral-300 mb-1">
+                        {isAr
+                          ? `اكتب اسم الشركة للتأكيد (${currentCompany.displayName || currentCompany.legalName}) *`
+                          : `Type Company Name (${currentCompany.displayName || currentCompany.legalName}) *`}
+                      </label>
+                      <input
+                        type="text"
+                        data-testid="factory-reset-company-name-input"
+                        value={confirmCompanyNameInput}
+                        onChange={(e) => setConfirmCompanyNameInput(e.target.value)}
+                        placeholder={currentCompany.displayName || currentCompany.legalName}
+                        className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-xs text-white focus:outline-none focus:border-rose-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-neutral-300 mb-1">
+                        {isAr
+                          ? 'كلمة مرور المالك أو رمز PIN للتأكيد *'
+                          : 'Owner Password or PIN *'}
+                      </label>
+                      <input
+                        type="password"
+                        data-testid="factory-reset-password-input"
+                        value={ownerPasswordInput}
+                        onChange={(e) => setOwnerPasswordInput(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-xs text-white focus:outline-none focus:border-rose-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-neutral-400 mb-1">
+                      {isAr ? 'سبب إعادة الضبط (يُحفظ في سجل التدقيق)' : 'Reset Reason (Saved in Audit Trail)'}
+                    </label>
+                    <input
+                      type="text"
+                      data-testid="factory-reset-reason-input"
+                      value={resetReasonInput}
+                      onChange={(e) => setResetReasonInput(e.target.value)}
+                      placeholder={
+                        isAr
+                          ? 'مثال: إعادة تهيئة المتجر لبداية سنة مالية جديدة'
+                          : 'e.g. Clean re-initialization for production launch'
+                      }
+                      className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-xs text-white focus:outline-none focus:border-rose-500"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Modal Actions */}
+              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-neutral-800">
+                <TactileButton
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setIsFactoryResetModalOpen(false)}
+                >
+                  {isAr ? 'إلغاء' : 'Cancel'}
+                </TactileButton>
+
+                <TactileButton
+                  type="button"
+                  variant="danger"
+                  size="sm"
+                  data-testid="factory-reset-confirm-btn"
+                  isLoading={isExecutingReset}
+                  leftIcon={<Trash2 className="w-3.5 h-3.5" />}
+                  onClick={async () => {
+                    setFactoryResetError(null);
+                    setIsExecutingReset(true);
+                    try {
+                      const res = await executeAuthorizedFactoryReset({
+                        scope: factoryResetScope,
+                        confirmCompanyName: confirmCompanyNameInput,
+                        ownerUsernameOrId: currentUser.username || currentUser.id,
+                        ownerPassword: ownerPasswordInput,
+                        reason: resetReasonInput,
+                      });
+                      if (!res.ok) {
+                        setFactoryResetError(
+                          res.error ||
+                            (isAr
+                              ? 'فشل التحقق من صلاحيات إعادة الضبط.'
+                              : 'Factory reset authorization failed.')
+                        );
+                        return;
+                      }
+                      setIsFactoryResetModalOpen(false);
+                    } finally {
+                      setIsExecutingReset(false);
+                    }
+                  }}
+                >
+                  {factoryResetScope === 'LOCAL_DEVICE_RESET'
+                    ? isAr
+                      ? 'تأكيد مسح بيانات الجهاز المحلي (0 بيانات افتراضية)'
+                      : 'Confirm Local Device Reset (0 Defaults)'
+                    : isAr
+                    ? 'تأكيد إعادة ضبط الشركة بالكامل'
+                    : 'Confirm Company Factory Reset'}
+                </TactileButton>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

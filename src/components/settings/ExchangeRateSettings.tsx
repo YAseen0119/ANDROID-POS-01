@@ -21,6 +21,7 @@ import {
   reconcileCurrenciesWithPersisted,
   loadPersistedExchangeRates,
   loadPersistedExchangeRateItems,
+  savePersistedExchangeRateItems,
   loadPersistedRateInputs,
   savePersistedRateInputs,
   reconcileRatesWithPersisted,
@@ -52,21 +53,31 @@ export const ExchangeRateSettings: React.FC<ExchangeRateSettingsProps> = ({
 }) => {
   const {
     settings,
+    workspaceMode,
+    currentCompany,
     currencies: contextCurrencies,
     exchangeRates: contextExchangeRates,
     exchangeRateItems: contextRateItems,
     saveCurrency,
     removeCurrency,
+    clearAllCurrencies,
+    setBaseCurrencyCode,
     syncCurrenciesState,
     updateExchangeRate,
     syncExchangeRatesState,
   } = usePOS();
+  const activeCompanyId = currentCompany?.id || '';
   const isAr = settings.language === 'ar';
 
   const onCurrenciesUpdatedRef = useRef(onCurrenciesUpdated);
   useEffect(() => {
     onCurrenciesUpdatedRef.current = onCurrenciesUpdated;
   }, [onCurrenciesUpdated]);
+
+  const workspaceModeRef = useRef(workspaceMode);
+  useEffect(() => {
+    workspaceModeRef.current = workspaceMode;
+  }, [workspaceMode]);
 
   const contextCurrenciesRef = useRef(contextCurrencies);
   useEffect(() => {
@@ -77,6 +88,11 @@ export const ExchangeRateSettings: React.FC<ExchangeRateSettingsProps> = ({
   useEffect(() => {
     contextExchangeRatesRef.current = contextExchangeRates;
   }, [contextExchangeRates]);
+
+  const contextRateItemsRef = useRef(contextRateItems);
+  useEffect(() => {
+    contextRateItemsRef.current = contextRateItems;
+  }, [contextRateItems]);
 
   const syncCurrenciesStateRef = useRef(syncCurrenciesState);
   useEffect(() => {
@@ -92,17 +108,16 @@ export const ExchangeRateSettings: React.FC<ExchangeRateSettingsProps> = ({
   const dirtyRatesRef = useRef<Set<string>>(new Set());
 
   const [currencies, setCurrencies] = useState<Currency[]>(() =>
-    contextCurrencies && contextCurrencies.length > 0
-      ? contextCurrencies
-      : loadPersistedCurrencies()
+    Array.isArray(contextCurrencies) ? contextCurrencies : []
   );
-  const [baseCurrency, setBaseCurrency] = useState<string>('SDG');
+  const [baseCurrency, setBaseCurrency] = useState<string>(() => {
+    const baseFound = (contextCurrencies || []).find((c) => c.isBase);
+    return baseFound?.code || settings.currency || 'SDG';
+  });
   const [rates, setRates] = useState<ExchangeRateItem[]>(() =>
     contextRateItems && contextRateItems.length > 0 ? contextRateItems : []
   );
-  const [loading, setLoading] = useState<boolean>(
-    () => !(contextRateItems && contextRateItems.length > 0)
-  );
+  const [loading, setLoading] = useState<boolean>(false);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
   const [successBanner, setSuccessBanner] = useState<string | null>(null);
@@ -113,6 +128,24 @@ export const ExchangeRateSettings: React.FC<ExchangeRateSettingsProps> = ({
       persistedDraftInputs: loadPersistedRateInputs(),
     })
   );
+
+  // Keep local state synchronized when company or workspace mode changes in POSContext
+  useEffect(() => {
+    const nextCurrencies = Array.isArray(contextCurrencies) ? contextCurrencies : [];
+    const baseFound = nextCurrencies.find((c) => c.isBase) || nextCurrencies[0];
+    if (baseFound) {
+      setBaseCurrency(baseFound.code);
+    }
+    const nextRates = contextRateItems || [];
+    setCurrencies(nextCurrencies);
+    setRates(nextRates);
+    setEditForms((prev) =>
+      mergeEditFormsState(prev, nextRates, contextExchangeRates || {}, {
+        forceOverwriteAll: true,
+        persistedDraftInputs: {},
+      })
+    );
+  }, [activeCompanyId, workspaceMode, contextCurrencies, contextRateItems, contextExchangeRates]);
 
   // Persist current input strings to LocalStorage whenever editForms updates so inputs never revert on remount/state update
   useEffect(() => {
@@ -140,9 +173,8 @@ export const ExchangeRateSettings: React.FC<ExchangeRateSettingsProps> = ({
   const [currName, setCurrName] = useState<string>('');
   const [currNameAr, setCurrNameAr] = useState<string>('');
   const [currSymbol, setCurrSymbol] = useState<string>('');
-  const [currInitialRate, setCurrInitialRate] = useState<string>(() =>
-    (contextExchangeRates?.USD || 2700).toString()
-  );
+  const [currInitialRate, setCurrInitialRate] = useState<string>('');
+  const [currIsBase, setCurrIsBase] = useState<boolean>(false);
   const [savingCurrency, setSavingCurrency] = useState<boolean>(false);
   const [currencyError, setCurrencyError] = useState<string | null>(null);
   const [confirmDeleteCode, setConfirmDeleteCode] = useState<string | null>(null);
@@ -152,9 +184,7 @@ export const ExchangeRateSettings: React.FC<ExchangeRateSettingsProps> = ({
   const [newRateModalOpen, setNewRateModalOpen] = useState<boolean>(false);
   const [newSource, setNewSource] = useState<string>('USD');
   const [newTarget, setNewTarget] = useState<string>('SDG');
-  const [newRateValue, setNewRateValue] = useState<string>(() =>
-    (contextExchangeRates?.USD || 2700).toString()
-  );
+  const [newRateValue, setNewRateValue] = useState<string>('');
   const [newEffectiveFrom, setNewEffectiveFrom] = useState<string>(
     new Date().toISOString().slice(0, 16)
   );
@@ -163,22 +193,68 @@ export const ExchangeRateSettings: React.FC<ExchangeRateSettingsProps> = ({
   const [newRateError, setNewRateError] = useState<string | null>(null);
   const [confirmDeleteRateId, setConfirmDeleteRateId] = useState<string | null>(null);
 
-  // Fetch currencies and effective exchange rates from PostgreSQL, reconciling with POSContext LocalStorage
+  // Synchronize currencies and exchange rates (100% offline-first; Production companies only show user-entered currencies/rates)
   const fetchData = useCallback(
     async (forceResetAll: boolean = false, forceOverwriteCurrencies: string[] = []) => {
       try {
         setErrorBanner(null);
-        const [currData, rateData] = await Promise.all([
-          api.getCurrencies(),
-          api.getExchangeRates(true),
-        ]);
+
+        if (workspaceModeRef.current === 'PRODUCTION') {
+          const companyCurrencies = Array.isArray(contextCurrenciesRef.current)
+            ? contextCurrenciesRef.current
+            : [];
+          const baseFound = companyCurrencies.find((c) => c.isBase) || companyCurrencies[0];
+          const resolvedBase = baseFound ? baseFound.code : 'SDG';
+          const companyRatesMap = contextExchangeRatesRef.current || {};
+          const companyRateItems = (contextRateItemsRef.current || []).filter((item) =>
+            companyCurrencies.some(
+              (c) => !c.isBase && c.code.toUpperCase() === item.sourceCurrency.toUpperCase()
+            )
+          );
+
+          setCurrencies(companyCurrencies);
+          setBaseCurrency(resolvedBase);
+          setRates(companyRateItems);
+
+          if (onCurrenciesUpdatedRef.current) {
+            onCurrenciesUpdatedRef.current(companyCurrencies);
+          }
+
+          if (forceResetAll) {
+            dirtyRatesRef.current.clear();
+            savePersistedRateInputs({});
+          }
+
+          setEditForms((prev) =>
+            mergeEditFormsState(prev, companyRateItems, companyRatesMap, {
+              forceOverwriteAll: forceResetAll,
+              forceOverwriteCurrencies,
+              persistedDraftInputs: loadPersistedRateInputs(),
+            })
+          );
+          return;
+        }
+
+        // Practice Mode: use Practice Mode state, optionally reconciling with server if online
+        let remoteCurrencies: Currency[] = [];
+        let remoteRates: ExchangeRateItem[] = [];
+        try {
+          const [currData, rateData] = await Promise.all([
+            api.getCurrencies(),
+            api.getExchangeRates(true),
+          ]);
+          remoteCurrencies = currData.currencies || [];
+          remoteRates = rateData || [];
+        } catch {
+          // Offline in Practice Mode: fall back to context state without error
+        }
 
         const persistedCurrencies = [
           ...loadPersistedCurrencies(),
           ...(contextCurrenciesRef.current || []),
         ];
         const mergedCurrencies = reconcileCurrenciesWithPersisted(
-          currData.currencies || [],
+          remoteCurrencies,
           persistedCurrencies
         );
 
@@ -188,14 +264,14 @@ export const ExchangeRateSettings: React.FC<ExchangeRateSettingsProps> = ({
         };
         const persistedItems = loadPersistedExchangeRateItems();
         const reconciledRates = reconcileRatesWithPersisted(
-          rateData,
+          remoteRates,
           persistedMap,
           persistedItems,
           mergedCurrencies
         );
 
         setCurrencies(mergedCurrencies);
-        setBaseCurrency(currData.baseCurrency || 'SDG');
+        setBaseCurrency('SDG');
         setRates(reconciledRates);
         syncCurrenciesStateRef.current(mergedCurrencies);
         syncExchangeRatesStateRef.current(reconciledRates);
@@ -209,7 +285,6 @@ export const ExchangeRateSettings: React.FC<ExchangeRateSettingsProps> = ({
           savePersistedRateInputs({});
         }
 
-        // Merge editForms without overwriting any existing input fields unless explicitly requested
         setEditForms((prev) =>
           mergeEditFormsState(prev, reconciledRates, persistedMap, {
             forceOverwriteAll: forceResetAll,
@@ -218,8 +293,7 @@ export const ExchangeRateSettings: React.FC<ExchangeRateSettingsProps> = ({
           })
         );
       } catch (err: any) {
-        console.error('Failed to load exchange rates from database:', err);
-        setErrorBanner(err.message || 'Failed to connect to database for exchange rates');
+        console.warn('Exchange rates sync fallback:', err);
       } finally {
         setLoading(false);
         setRefreshing(false);
@@ -238,7 +312,7 @@ export const ExchangeRateSettings: React.FC<ExchangeRateSettingsProps> = ({
     await fetchData(true);
   };
 
-  // Open form to add a new custom currency
+  // Open form to add a new custom currency (no pre-filled default rate!)
   const handleOpenAddCurrency = () => {
     playTactileClick(settings.soundEnabled);
     setEditingCurrency(null);
@@ -246,7 +320,7 @@ export const ExchangeRateSettings: React.FC<ExchangeRateSettingsProps> = ({
     setCurrName('');
     setCurrNameAr('');
     setCurrSymbol('');
-    setCurrInitialRate('100');
+    setCurrInitialRate('');
     setCurrencyError(null);
     setCurrencyModalOpen(true);
   };
@@ -264,7 +338,7 @@ export const ExchangeRateSettings: React.FC<ExchangeRateSettingsProps> = ({
     const persistedRate = contextExchangeRates?.[c.code];
     setCurrInitialRate(
       formRate ||
-        (activeRate ? activeRate.rate.toString() : persistedRate ? persistedRate.toString() : '2700')
+        (activeRate ? activeRate.rate.toString() : persistedRate ? persistedRate.toString() : '')
     );
     setCurrencyError(null);
     setCurrencyModalOpen(true);
@@ -291,8 +365,7 @@ export const ExchangeRateSettings: React.FC<ExchangeRateSettingsProps> = ({
       return;
     }
 
-    const parsedInitialRate =
-      parseNormalizedNumber(currInitialRate, 0) || resolved.suggestedRate || 0;
+    const parsedInitialRate = parseNormalizedNumber(currInitialRate, 0);
     if (cleanCode !== 'SDG' && parsedInitialRate <= 0) {
       setCurrencyError(
         isAr
@@ -372,7 +445,6 @@ export const ExchangeRateSettings: React.FC<ExchangeRateSettingsProps> = ({
           : `Currency (${cleanCode} - ${resolved.name}) saved with rate ${parsedInitialRate} SDG!`
       );
       setTimeout(() => setSuccessBanner(null), 5000);
-      await fetchData(false, [cleanCode]);
     } catch (err: any) {
       setCurrencyError(err.message || 'Failed to save currency');
     } finally {
@@ -399,7 +471,6 @@ export const ExchangeRateSettings: React.FC<ExchangeRateSettingsProps> = ({
         isAr ? `تم حذف العملة (${code}) بنجاح.` : `Currency (${code}) deleted successfully.`
       );
       setTimeout(() => setSuccessBanner(null), 4000);
-      await fetchData();
     } catch (err: any) {
       setErrorBanner(err.message || 'Failed to delete currency');
     } finally {
@@ -407,11 +478,25 @@ export const ExchangeRateSettings: React.FC<ExchangeRateSettingsProps> = ({
     }
   };
 
-  // Delete an exchange rate entry
+  // Delete an exchange rate entry (100% offline-capable)
   const handleDeleteRateRecord = async (id: string, sourceCode: string) => {
     try {
       playTactileClick(settings.soundEnabled);
-      await api.deleteExchangeRate(id);
+      try {
+        await api.deleteExchangeRate(id);
+      } catch {
+        // Offline-first: proceed with local deletion even when server is unreachable
+      }
+      const remainingPersistedItems = loadPersistedExchangeRateItems().filter(
+        (item) => item.id !== id && item.sourceCurrency.toUpperCase() !== sourceCode.toUpperCase()
+      );
+      savePersistedExchangeRateItems(remainingPersistedItems);
+      await removeCurrency(sourceCode);
+      setRates((prev) =>
+        prev.filter(
+          (item) => item.id !== id && item.sourceCurrency.toUpperCase() !== sourceCode.toUpperCase()
+        )
+      );
       playSuccessChime(settings.soundEnabled);
       setConfirmDeleteRateId(null);
       setSuccessBanner(
@@ -420,13 +505,12 @@ export const ExchangeRateSettings: React.FC<ExchangeRateSettingsProps> = ({
           : `Exchange rate record for (${sourceCode}) removed.`
       );
       setTimeout(() => setSuccessBanner(null), 4000);
-      await fetchData(false, [sourceCode]);
     } catch (err: any) {
       setErrorBanner(err.message || 'Failed to delete exchange rate');
     }
   };
 
-  // Auto-find existing rate when pair changes, prioritizing current editForms and POSContext LocalStorage
+  // Auto-find existing rate when pair changes, using ONLY user-entered rates (no hardcoded defaults)
   const updateDefaultRateForPair = (src: string, tgt: string) => {
     if (tgt === 'SDG' && editForms[src]?.rate) {
       setNewRateValue(editForms[src].rate);
@@ -446,12 +530,7 @@ export const ExchangeRateSettings: React.FC<ExchangeRateSettingsProps> = ({
       setNewRateValue((1 / inverse.rate).toFixed(6));
       return;
     }
-    if (src === 'USD' && tgt === 'SDG') setNewRateValue('2700');
-    else if (src === 'SAR' && tgt === 'SDG') setNewRateValue('720');
-    else if (src === 'AED' && tgt === 'SDG') setNewRateValue('735');
-    else if (src === 'EUR' && tgt === 'SDG') setNewRateValue('2950');
-    else if (src === 'GBP' && tgt === 'SDG') setNewRateValue('3450');
-    else setNewRateValue('100');
+    setNewRateValue('');
   };
 
   // Safe source currency selector that auto-resolves identical target
@@ -580,7 +659,7 @@ export const ExchangeRateSettings: React.FC<ExchangeRateSettingsProps> = ({
     }
   };
 
-  // Open history modal for a currency pair
+  // Open history modal for a currency pair (offline-capable)
   const handleOpenHistory = async (source: string, target: string) => {
     setHistoryPair({ source, target });
     setHistoryModalOpen(true);
@@ -590,8 +669,11 @@ export const ExchangeRateSettings: React.FC<ExchangeRateSettingsProps> = ({
     try {
       const history = await api.getExchangeRateHistory(source, target);
       setHistoryItems(history);
-    } catch (err: any) {
-      console.error('Failed to load rate history:', err);
+    } catch {
+      const localMatches = rates.filter(
+        (r) => r.sourceCurrency === source && r.targetCurrency === target
+      );
+      setHistoryItems(localMatches);
     } finally {
       setLoadingHistory(false);
     }
@@ -667,49 +749,67 @@ export const ExchangeRateSettings: React.FC<ExchangeRateSettingsProps> = ({
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-bold text-sm text-white">
                 {isAr
-                  ? 'تخصيص العملات وأسعار الصرف (إضافة / تعديل / حذف)'
-                  : 'Full Currency & Exchange Rate Customization'}
+                  ? 'تخصيص العملات وأسعار الصرف (بدون أي عملات افتراضية)'
+                  : 'Full Currency & Exchange Rate Customization (Zero Default Currencies)'}
               </h3>
-              <AppBadge variant="amber" size="sm">
-                {isAr ? `الأساسية: ${baseCurrency} (ج.س)` : `Base: ${baseCurrency} (ج.س)`}
-              </AppBadge>
+              {currencies.length > 0 && (
+                <AppBadge variant="amber" size="sm">
+                  {isAr ? `الأساسية: ${baseCurrency}` : `Base: ${baseCurrency}`}
+                </AppBadge>
+              )}
             </div>
             <span className="text-[11px] text-neutral-400 block">
               {isAr
-                ? 'أضف عملات جديدة، احذف العملات غير المطلوبة، وعدّل سعر الدولار وبقية العملات بسهولة'
-                : 'Add custom currencies, delete unused ones, and adjust USD or any foreign rate effortlessly'}
+                ? 'لا يتم إضافة أي عملات افتراضية تلقائياً — أضف عملاتك الخاصة فقط أو احذف أي عملة بحرية'
+                : 'No default currencies are added automatically — add only your own currencies and rates'}
             </span>
           </div>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          <TactileButton
-            variant="ghost"
-            size="sm"
-            onClick={handleRefresh}
-            isLoading={refreshing}
-            leftIcon={<RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />}
-            className="text-neutral-400 hover:text-white"
-          >
-            {isAr ? 'تحديث' : 'Refresh'}
-          </TactileButton>
+          {currencies.length > 0 && (
+            <button
+              type="button"
+              data-testid="clear-all-currencies-btn"
+              onClick={async () => {
+                playTactileClick(settings.soundEnabled);
+                await clearAllCurrencies();
+                setCurrencies([]);
+                setRates([]);
+                setEditForms({});
+                setSuccessBanner(
+                  isAr
+                    ? 'تم مسح جميع العملات وأسعار الصرف. يمكنك الآن إضافة عملاتك الخاصة من الصفر.'
+                    : 'All currencies and exchange rates cleared. You can now add your own currencies.'
+                );
+                setTimeout(() => setSuccessBanner(null), 4000);
+              }}
+              className="px-2.5 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 text-xs font-bold flex items-center gap-1.5 transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>{isAr ? 'مسح جميع العملات' : 'Clear All Currencies'}</span>
+            </button>
+          )}
 
-          <TactileButton
-            variant="secondary"
-            size="sm"
-            onClick={() => {
-              playTactileClick(settings.soundEnabled);
-              updateDefaultRateForPair(newSource, newTarget);
-              setNewRateModalOpen(true);
-            }}
-            leftIcon={<ArrowRightLeft className="w-3.5 h-3.5 text-amber-400" />}
-          >
-            {isAr ? 'تعديل زوج صرف' : 'Set Pair Rate'}
-          </TactileButton>
+          {currencies.length >= 2 && (
+            <TactileButton
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                playTactileClick(settings.soundEnabled);
+                updateDefaultRateForPair(newSource, newTarget);
+                setNewRateModalOpen(true);
+              }}
+              leftIcon={<ArrowRightLeft className="w-3.5 h-3.5 text-amber-400" />}
+            >
+              {isAr ? 'تعديل زوج صرف' : 'Set Pair Rate'}
+            </TactileButton>
+          )}
 
           <TactileButton
             variant="amber"
             size="sm"
+            data-testid="open-add-currency-btn"
             onClick={handleOpenAddCurrency}
             leftIcon={<Plus className="w-3.5 h-3.5" />}
           >
@@ -746,14 +846,14 @@ export const ExchangeRateSettings: React.FC<ExchangeRateSettingsProps> = ({
                       ? `تعديل بيانات العملة (${editingCurrency.code})`
                       : `Edit Currency (${editingCurrency.code})`
                     : isAr
-                    ? 'إضافة عملة جديدة للنظام'
-                    : 'Add New Custom Currency'}
+                    ? 'إضافة عملة مخصصة جديدة'
+                    : 'Add Custom Currency'}
                 </span>
               </h4>
               <p className="text-[11px] text-neutral-400 mt-0.5">
                 {isAr
-                  ? 'اختر من القوالب الجاهزة بضغطة واحدة أو اكتب اسم/رمز العملة وسعر صرفها مقابل الجنيه السوداني'
-                  : 'Pick a quick template with one click or enter the currency code/name and exchange rate to SDG'}
+                  ? 'أدخل رمز العملة واسمها وحدد ما إذا كانت العملة الأساسية أو أدخل سعر صرفها'
+                  : 'Enter currency code, name, symbol, and whether it is the base currency or its exchange rate'}
               </p>
             </div>
             <button
@@ -774,13 +874,13 @@ export const ExchangeRateSettings: React.FC<ExchangeRateSettingsProps> = ({
               </div>
             )}
 
-            {/* Quick Templates for Popular Regional & Global Currencies */}
-            {!editingCurrency && (
+            {/* Quick Templates shown ONLY in Practice Mode */}
+            {!editingCurrency && workspaceMode === 'PRACTICE' && (
               <div>
                 <span className="text-[11px] text-neutral-300 font-semibold block mb-1.5">
                   {isAr
-                    ? 'قوالب عملات جاهزة (اضغط على أي عملة لتعبئة بياناتها فوراً):'
-                    : 'Quick currency templates (click to auto-fill):'}
+                    ? 'قوالب عملات جاهزة للتدريب (اضغط على أي عملة لتعبئة بياناتها):'
+                    : 'Practice currency templates (click to auto-fill):'}
                 </span>
                 <div className="flex flex-wrap gap-1.5">
                   {CURRENCY_TEMPLATES.map((tpl) => {
@@ -815,35 +915,20 @@ export const ExchangeRateSettings: React.FC<ExchangeRateSettingsProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
               <div>
                 <label className="text-xs font-semibold text-neutral-300 block mb-1">
-                  {isAr ? 'رمز العملة (مثل EGP أو QAR)' : 'Currency Code (e.g. EGP, QAR)'}
+                  {isAr ? 'رمز العملة (مثل SDG أو USD) *' : 'Currency Code (e.g. SDG, USD) *'}
                 </label>
                 <input
                   type="text"
                   dir="ltr"
+                  data-testid="custom-currency-code-input"
                   disabled={Boolean(editingCurrency)}
-                  maxLength={12}
+                  maxLength={6}
                   value={currCode}
                   onChange={(e) => {
-                    const val = e.target.value;
-                    setCurrCode(val.toUpperCase());
+                    setCurrCode(e.target.value.toUpperCase());
                     setCurrencyError(null);
-                    if (!editingCurrency && val.trim().length >= 2) {
-                      const matched = CURRENCY_TEMPLATES.find(
-                        (t) =>
-                          t.code === val.trim().toUpperCase() ||
-                          t.keywords.includes(val.trim().toLowerCase())
-                      );
-                      if (matched) {
-                        if (!currName) setCurrName(matched.name);
-                        if (!currNameAr) setCurrNameAr(matched.nameAr);
-                        if (!currSymbol) setCurrSymbol(matched.symbol);
-                        if (!currInitialRate || currInitialRate === '100') {
-                          setCurrInitialRate(matched.defaultRate.toString());
-                        }
-                      }
-                    }
                   }}
-                  placeholder={isAr ? 'مثال: EGP أو QAR' : 'e.g. EGP'}
+                  placeholder={isAr ? 'مثال: SDG أو USD' : 'e.g. SDG or USD'}
                   className="w-full bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white font-mono font-bold uppercase focus:outline-none focus:border-amber-500 disabled:opacity-60"
                 />
               </div>
@@ -854,28 +939,13 @@ export const ExchangeRateSettings: React.FC<ExchangeRateSettingsProps> = ({
                 </label>
                 <input
                   type="text"
+                  data-testid="custom-currency-name-ar-input"
                   value={currNameAr}
                   onChange={(e) => {
-                    const val = e.target.value;
-                    setCurrNameAr(val);
+                    setCurrNameAr(e.target.value);
                     setCurrencyError(null);
-                    if (!editingCurrency && val.trim().length >= 2) {
-                      const matched = CURRENCY_TEMPLATES.find(
-                        (t) =>
-                          t.nameAr === val.trim() ||
-                          t.keywords.includes(val.trim().toLowerCase())
-                      );
-                      if (matched) {
-                        if (!currCode) setCurrCode(matched.code);
-                        if (!currName) setCurrName(matched.name);
-                        if (!currSymbol) setCurrSymbol(matched.symbol);
-                        if (!currInitialRate || currInitialRate === '100') {
-                          setCurrInitialRate(matched.defaultRate.toString());
-                        }
-                      }
-                    }
                   }}
-                  placeholder="مثال: جنيه مصري"
+                  placeholder={isAr ? 'مثال: جنيه سوداني / دولار' : 'e.g. جنيه سوداني'}
                   className="w-full bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
                 />
               </div>
@@ -886,52 +956,72 @@ export const ExchangeRateSettings: React.FC<ExchangeRateSettingsProps> = ({
                 </label>
                 <input
                   type="text"
+                  data-testid="custom-currency-name-en-input"
                   value={currName}
                   onChange={(e) => {
                     setCurrName(e.target.value);
                     setCurrencyError(null);
                   }}
-                  placeholder="e.g. Egyptian Pound"
+                  placeholder="e.g. Sudanese Pound / US Dollar"
                   className="w-full bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
                 />
               </div>
 
               <div>
                 <label className="text-xs font-semibold text-neutral-300 block mb-1">
-                  {isAr ? 'الرمز المختصر (اختياري، مثل ج.م)' : 'Symbol (e.g. $, ج.م)'}
+                  {isAr ? 'الرمز المختصر (مثل ج.س أو $)' : 'Symbol (e.g. $, ج.س)'}
                 </label>
                 <input
                   type="text"
+                  data-testid="custom-currency-symbol-input"
                   maxLength={6}
                   value={currSymbol}
                   onChange={(e) => {
                     setCurrSymbol(e.target.value);
                     setCurrencyError(null);
                   }}
-                  placeholder="مثال: ج.م"
+                  placeholder="مثال: ج.س أو $"
                   className="w-full bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white font-bold focus:outline-none focus:border-amber-500"
                 />
               </div>
             </div>
 
-            {currCode.toUpperCase() !== 'SDG' && (
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-neutral-900/80 border border-neutral-800">
+              <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-neutral-200">
+                <input
+                  type="checkbox"
+                  data-testid="custom-currency-is-base-checkbox"
+                  checked={currIsBase || currencies.length === 0}
+                  onChange={(e) => setCurrIsBase(e.target.checked)}
+                  className="rounded border-neutral-700 text-amber-500 focus:ring-amber-500"
+                />
+                <span>
+                  {isAr
+                    ? 'تعيين كعملة أساسية للمتجر (Base Currency — سعر الصرف = 1)'
+                    : 'Set as Store Base Currency (Rate = 1)'}
+                </span>
+              </label>
+            </div>
+
+            {!currIsBase && currencies.length > 0 && (
               <div>
                 <label className="text-xs font-semibold text-neutral-300 block mb-1">
                   {isAr
-                    ? `سعر الصرف مقابل الجنيه السوداني (1 ${currCode || currNameAr || 'عملة'} = كم ج.س؟)`
-                    : `Exchange Rate to Base SDG (1 ${currCode || 'Unit'} = ? SDG)`}
+                    ? `سعر الصرف مقابل العملة الأساسية (${baseCurrency}) (1 ${currCode || currNameAr || 'عملة'} = كم ${baseCurrency}؟)`
+                    : `Exchange Rate to Base (${baseCurrency}) (1 ${currCode || 'Unit'} = ? ${baseCurrency})`}
                 </label>
                 <div className="relative flex items-center">
                   <input
                     type="text"
                     inputMode="decimal"
                     dir="ltr"
+                    data-testid="custom-currency-rate-input"
                     value={currInitialRate}
                     onChange={(e) => {
                       setCurrInitialRate(normalizeNumberInput(e.target.value));
                       setCurrencyError(null);
                     }}
-                    placeholder="100"
+                    placeholder={isAr ? 'أدخل سعر الصرف...' : 'Enter exchange rate...'}
                     className="w-full bg-neutral-900 border border-neutral-700 rounded-xl pl-3.5 pr-16 py-2.5 text-base text-white font-mono font-bold focus:outline-none focus:border-amber-500"
                   />
                   {currInitialRate && (
@@ -944,7 +1034,7 @@ export const ExchangeRateSettings: React.FC<ExchangeRateSettingsProps> = ({
                     </button>
                   )}
                   <span className="absolute right-3.5 text-xs font-mono font-bold text-amber-400 pointer-events-none">
-                    SDG
+                    {baseCurrency}
                   </span>
                 </div>
               </div>
@@ -960,7 +1050,13 @@ export const ExchangeRateSettings: React.FC<ExchangeRateSettingsProps> = ({
                 {isAr ? 'إلغاء' : 'Cancel'}
               </TactileButton>
 
-              <TactileButton variant="amber" size="sm" type="submit" isLoading={savingCurrency}>
+              <TactileButton
+                variant="amber"
+                size="sm"
+                type="submit"
+                data-testid="save-custom-currency-btn"
+                isLoading={savingCurrency}
+              >
                 {editingCurrency
                   ? isAr
                     ? 'حفظ تعديلات العملة'
@@ -979,86 +1075,118 @@ export const ExchangeRateSettings: React.FC<ExchangeRateSettingsProps> = ({
         <div className="flex items-center justify-between mb-2.5">
           <span className="text-xs font-bold text-neutral-200">
             {isAr
-              ? `قائمة العملات المسجلة (${currencies.length})`
+              ? `قائمة العملات المضافة (${currencies.length})`
               : `Configured Currencies (${currencies.length})`}
           </span>
           <span className="text-[11px] text-neutral-400">
             {isAr
-              ? 'اضغط على أي عملة لتعديل اسمها أو رمزها، أو احذفها'
-              : 'Click edit to customize or trash icon to delete'}
+              ? 'يمكنك تعديل أو حذف أي عملة أو تعيينها كعملة أساسية'
+              : 'Edit, delete, or set any currency as base'}
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-          {currencies.map((c) => {
-            const isConfirmingDelete = confirmDeleteCode === c.code;
-            return (
-              <div
-                key={c.code}
-                className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 transition-all ${
-                  c.isBase
-                    ? 'bg-amber-500/10 border-amber-500/40'
-                    : 'bg-neutral-900/90 border-neutral-800 hover:border-neutral-700'
-                }`}
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <span
-                    className={`px-2 py-1 rounded-lg font-mono text-xs font-extrabold shrink-0 ${
-                      c.isBase
-                        ? 'bg-amber-500 text-neutral-950'
-                        : 'bg-neutral-800 text-white border border-neutral-700'
-                    }`}
-                  >
-                    {c.code}
-                  </span>
-                  <div className="truncate">
-                    <div className="text-xs font-bold text-white truncate">
-                      {isAr && c.nameAr ? c.nameAr : c.name}
-                    </div>
-                    <div className="text-[10px] text-neutral-400 font-mono">
-                      {isAr ? `الرمز: ${c.symbol}` : `Symbol: ${c.symbol}`}
-                      {c.isBase ? (isAr ? ' • أساسية' : ' • Base') : ''}
+        {currencies.length === 0 ? (
+          <div
+            data-testid="empty-currencies-state"
+            className="p-6 rounded-xl bg-neutral-900/60 border border-dashed border-neutral-800 text-center space-y-2"
+          >
+            <p className="text-xs font-bold text-neutral-200">
+              {isAr
+                ? 'لا توجد أي عملات مضافة حالياً (صفر عملات افتراضية)'
+                : 'No currencies added yet (Zero default currencies)'}
+            </p>
+            <p className="text-[11px] text-neutral-400">
+              {isAr
+                ? 'اضغط على "إضافة عملة جديدة" أعلاه لإضافة عملتك الأساسية والعملات التي تتعامل بها فقط.'
+                : 'Click "Add Currency" above to add your store base currency and any additional currencies you use.'}
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+            {currencies.map((c) => {
+              const isConfirmingDelete = confirmDeleteCode === c.code;
+              return (
+                <div
+                  key={c.code}
+                  data-testid={`currency-card-${c.code}`}
+                  className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 transition-all ${
+                    c.isBase
+                      ? 'bg-amber-500/10 border-amber-500/40'
+                      : 'bg-neutral-900/90 border-neutral-800 hover:border-neutral-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span
+                      className={`px-2 py-1 rounded-lg font-mono text-xs font-extrabold shrink-0 ${
+                        c.isBase
+                          ? 'bg-amber-500 text-neutral-950'
+                          : 'bg-neutral-800 text-white border border-neutral-700'
+                      }`}
+                    >
+                      {c.code}
+                    </span>
+                    <div className="truncate">
+                      <div className="text-xs font-bold text-white truncate">
+                        {isAr && c.nameAr ? c.nameAr : c.name}
+                      </div>
+                      <div className="text-[10px] text-neutral-400 font-mono">
+                        {isAr ? `الرمز: ${c.symbol}` : `Symbol: ${c.symbol}`}
+                        {c.isBase ? (isAr ? ' • أساسية' : ' • Base') : ''}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Edit / Delete Controls */}
-                <div className="flex items-center gap-1 shrink-0">
-                  {isConfirmingDelete ? (
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        disabled={deletingCurrencyCode === c.code}
-                        onClick={() => handleDeleteCurrency(c.code)}
-                        className="px-2 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-bold"
-                      >
-                        {deletingCurrencyCode === c.code
-                          ? '...'
-                          : isAr
-                          ? 'تأكيد الحذف'
-                          : 'Confirm'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setConfirmDeleteCode(null)}
-                        className="px-1.5 py-1 rounded-lg bg-neutral-800 text-neutral-300 text-[10px]"
-                      >
-                        {isAr ? 'إلغاء' : 'Cancel'}
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => handleOpenEditCurrency(c)}
-                        title={isAr ? 'تعديل العملة' : 'Edit Currency'}
-                        className="p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
-                      {!c.isBase && (
+                  {/* Edit / Set Base / Delete Controls */}
+                  <div className="flex items-center gap-1 shrink-0">
+                    {isConfirmingDelete ? (
+                      <div className="flex items-center gap-1">
                         <button
                           type="button"
+                          disabled={deletingCurrencyCode === c.code}
+                          onClick={() => handleDeleteCurrency(c.code)}
+                          className="px-2 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-bold"
+                        >
+                          {deletingCurrencyCode === c.code
+                            ? '...'
+                            : isAr
+                            ? 'تأكيد الحذف'
+                            : 'Confirm'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteCode(null)}
+                          className="px-1.5 py-1 rounded-lg bg-neutral-800 text-neutral-300 text-[10px]"
+                        >
+                          {isAr ? 'إلغاء' : 'Cancel'}
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        {!c.isBase && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              playTactileClick(settings.soundEnabled);
+                              setBaseCurrency(c.code);
+                              setBaseCurrencyCode(c.code);
+                            }}
+                            title={isAr ? 'تعيين كعملة أساسية' : 'Set as Base Currency'}
+                            className="px-1.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition-colors"
+                          >
+                            {isAr ? 'أساسية' : 'Base'}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditCurrency(c)}
+                          title={isAr ? 'تعديل العملة' : 'Edit Currency'}
+                          className="p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          data-testid={`delete-currency-btn-${c.code}`}
                           onClick={() => {
                             playTactileClick(settings.soundEnabled);
                             setConfirmDeleteCode(c.code);
@@ -1068,14 +1196,14 @@ export const ExchangeRateSettings: React.FC<ExchangeRateSettingsProps> = ({
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
-                      )}
-                    </>
-                  )}
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Section 2: Exchange Rates Grid / List */}

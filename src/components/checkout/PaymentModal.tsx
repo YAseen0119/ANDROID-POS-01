@@ -13,6 +13,7 @@ import { formatCurrency, calculateDebtBreakdown, roundCurrencyValue } from '../.
 import {
   PaymentMethod,
   PaymentSettlementStatus,
+  InvoiceFulfillmentType,
   Transaction,
   SupportedCurrency,
 } from '../../lib/types';
@@ -30,6 +31,9 @@ import {
   CheckCircle2,
   Clock,
   FileWarning,
+  PackageCheck,
+  FileText,
+  Truck,
 } from 'lucide-react';
 import { playTactileClick } from '../../lib/sound-fx';
 import { normalizeNumberInput, parseNormalizedNumber } from '../../lib/number-utils';
@@ -89,6 +93,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onS
 
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [paymentStatus, setPaymentStatus] = useState<PaymentSettlementStatus>('paid');
+  const [fulfillmentType, setFulfillmentType] =
+    useState<InvoiceFulfillmentType>('goods_and_invoice');
   const [transferReference, setTransferReference] = useState<string>('');
   const [transferReceiptImage, setTransferReceiptImage] = useState<string>('');
   const receiptFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -150,6 +156,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onS
       setTenderCurrency(settings.currency);
       setTenderedInput(formatAmountForInput(cartTotals.grandTotal));
       setPaymentStatus('paid');
+      setFulfillmentType('goods_and_invoice');
       setTransferReference('');
       setTransferReceiptImage('');
       setButtonStatus('ready');
@@ -348,13 +355,33 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onS
     // Realistic terminal authorization delay
     await new Promise((res) => setTimeout(res, 500));
 
-    // Submit payment in base store currency with full transfer & debt details
+    const activeCurrencyCode = (settings.currency || 'SDG').toUpperCase().trim();
+    const saleRateSnapshot: Record<string, number> = {
+      ...exchangeRatesMap,
+      ...(contextExchangeRates || {}),
+      SDG: 1,
+    };
+    const saleRateUsed =
+      activeCurrencyCode === 'SDG'
+        ? Number(saleRateSnapshot[tenderCurrency !== 'SDG' ? tenderCurrency : 'USD'] || 2700)
+        : Number(saleRateSnapshot[activeCurrencyCode] || 1);
+
+    // Submit payment in base store currency with full transfer, debt, fulfillment & locked sale exchange rate details
     const result = await processCheckout(paymentMethod, tenderedInBaseCurrency, {
       transferReference: paymentMethod === 'bank_transfer' ? transferReference.trim() : undefined,
       transferReceiptImage: paymentMethod === 'bank_transfer' ? transferReceiptImage : undefined,
       paymentStatus,
       amountPaid: debtBreakdown.amountPaid,
       debtAmount: debtBreakdown.debtAmount,
+      fulfillmentType,
+      fulfillmentStatus:
+        fulfillmentType === 'invoice_only'
+          ? 'pending_goods'
+          : fulfillmentType === 'goods_only'
+          ? 'pending_invoice'
+          : 'received',
+      exchangeRateUsed: saleRateUsed,
+      exchangeRatesSnapshot: saleRateSnapshot,
     });
 
     if (result.success && result.transaction) {
@@ -387,7 +414,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onS
           <div>
             <span className="text-xs text-neutral-400 block font-medium">{t.total}</span>
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl sm:text-3xl font-extrabold text-amber-400 font-mono tracking-tight tabular-nums">
+              <span className="text-2xl sm:text-3xl font-extrabold text-amber-400 tracking-tight tabular-nums">
                 {formatCurrency(cartTotals.grandTotal, settings.currency, settings.language)}
               </span>
               {tenderCurrency !== settings.currency && (
@@ -396,11 +423,43 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onS
                 </span>
               )}
             </div>
-            {tenderCurrency !== settings.currency && (
-              <span className="text-[11px] font-mono text-neutral-500 block mt-0.5">
-                Rate: 1 {tenderCurrency} = {conversionRate.toLocaleString()} {settings.currency}
-              </span>
-            )}
+            <span className="text-[11px] text-emerald-400 font-semibold block mt-1">
+              {isAr ? (
+                <>
+                  يحفظ بسعر صرف البيع:{' '}
+                  <span className="font-mono font-bold text-white" dir="ltr">
+                    1 {tenderCurrency !== 'SDG' ? tenderCurrency : settings.currency !== 'SDG' ? settings.currency : 'USD'} ={' '}
+                    {(
+                      exchangeRatesMap[
+                        tenderCurrency !== 'SDG'
+                          ? tenderCurrency
+                          : settings.currency !== 'SDG'
+                          ? settings.currency
+                          : 'USD'
+                      ] || 2700
+                    ).toLocaleString()}{' '}
+                    SDG
+                  </span>
+                </>
+              ) : (
+                <>
+                  Saved at Sale Rate:{' '}
+                  <span className="font-mono font-bold text-white" dir="ltr">
+                    1 {tenderCurrency !== 'SDG' ? tenderCurrency : settings.currency !== 'SDG' ? settings.currency : 'USD'} ={' '}
+                    {(
+                      exchangeRatesMap[
+                        tenderCurrency !== 'SDG'
+                          ? tenderCurrency
+                          : settings.currency !== 'SDG'
+                          ? settings.currency
+                          : 'USD'
+                      ] || 2700
+                    ).toLocaleString()}{' '}
+                    SDG
+                  </span>
+                </>
+              )}
+            </span>
           </div>
 
           {paymentStatus === 'paid' && paymentMethod === 'cash' && changeDueInBase > 0 && (
@@ -594,6 +653,66 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onS
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Invoice Receipt vs Goods Receipt Option (خيار استلام الفاتورة أو استلام البضاعة) */}
+          <div className="p-3 bg-neutral-950/80 border border-neutral-800 rounded-2xl space-y-2">
+            <label className="text-xs font-semibold text-neutral-300 flex items-center gap-1.5">
+              <PackageCheck className="w-3.5 h-3.5 text-amber-400" />
+              <span>{t.fulfillmentOptionTitle}</span>
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <button
+                type="button"
+                data-testid="fulfillment-opt-goods-and-invoice"
+                onClick={() => {
+                  playTactileClick(settings.soundEnabled);
+                  setFulfillmentType('goods_and_invoice');
+                }}
+                className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl border text-xs font-bold transition-all ${
+                  fulfillmentType === 'goods_and_invoice'
+                    ? 'bg-emerald-500/15 border-emerald-500 text-emerald-300 shadow-xs'
+                    : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-neutral-200'
+                }`}
+              >
+                <PackageCheck className="w-3.5 h-3.5 shrink-0" />
+                <span>{isAr ? 'استلام البضاعة والفاتورة' : 'Goods & Invoice'}</span>
+              </button>
+
+              <button
+                type="button"
+                data-testid="fulfillment-opt-invoice-only"
+                onClick={() => {
+                  playTactileClick(settings.soundEnabled);
+                  setFulfillmentType('invoice_only');
+                }}
+                className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl border text-xs font-bold transition-all ${
+                  fulfillmentType === 'invoice_only'
+                    ? 'bg-amber-500/15 border-amber-500 text-amber-300 shadow-xs'
+                    : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-neutral-200'
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5 shrink-0" />
+                <span>{isAr ? 'استلام الفاتورة فقط' : 'Invoice Only'}</span>
+              </button>
+
+              <button
+                type="button"
+                data-testid="fulfillment-opt-goods-only"
+                onClick={() => {
+                  playTactileClick(settings.soundEnabled);
+                  setFulfillmentType('goods_only');
+                }}
+                className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl border text-xs font-bold transition-all ${
+                  fulfillmentType === 'goods_only'
+                    ? 'bg-blue-500/15 border-blue-500 text-blue-300 shadow-xs'
+                    : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-neutral-200'
+                }`}
+              >
+                <Truck className="w-3.5 h-3.5 shrink-0" />
+                <span>{isAr ? 'استلام بضاعة فقط' : 'Goods Only'}</span>
+              </button>
+            </div>
           </div>
         </div>
 

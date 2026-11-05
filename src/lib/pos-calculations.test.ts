@@ -15,8 +15,17 @@ import {
   formatCurrency,
   convertCurrencyAmount,
   getProductPricesInCurrency,
+  getProductPackaging,
+  getCartItemUnitPricing,
+  formatProductStockBreakdown,
   getConvertedTransactionView,
   repriceTransactionToNewRate,
+  lockTransactionSaleExchangeRate,
+  computeStoreReportAnalytics,
+  computeExchangeRateFluctuationSummary,
+  applyDebtSettlementPayment,
+  getAllTransactionReceiptImages,
+  computeDailyRevenueTrends,
 } from './pos-calculations';
 import { CartItem, Product, Transaction } from './types';
 
@@ -305,4 +314,519 @@ test('getConvertedTransactionView and repriceTransactionToNewRate handle currenc
   assert.equal(repriced.exchangeRatesSnapshot?.USD, 3000);
 });
 
+test('computeStoreReportAnalytics and computeExchangeRateFluctuationSummary compute store badges, product currency charts, and rate fluctuations', () => {
+  const products: Product[] = [
+    {
+      ...mockProductA,
+      id: 'prod-1',
+      costPrice: 1,
+      sellingPrice: 4,
+      priceCurrency: 'USD',
+      stock: 20,
+      minStockAlert: 5,
+    },
+    {
+      ...mockProductB,
+      id: 'prod-2',
+      costPrice: 2,
+      sellingPrice: 5,
+      priceCurrency: 'USD',
+      stock: 2,
+      minStockAlert: 5,
+    },
+  ];
 
+  const tx1: Transaction = {
+    id: 'TXN-REP-1',
+    idempotencyKey: 'rep-1',
+    timestamp: new Date().toISOString(),
+    currency: 'USD',
+    exchangeRateUsed: 2700,
+    exchangeRatesSnapshot: { SDG: 1, USD: 2700, SAR: 720 },
+    items: [
+      {
+        productId: 'prod-1',
+        productName: mockProductA.name,
+        sku: mockProductA.sku,
+        quantity: 3,
+        unitPrice: 4,
+        discountPercent: 0,
+        total: 12,
+      },
+    ],
+    subtotal: 12,
+    taxRatePercent: 0,
+    taxAmount: 0,
+    discountAmount: 0,
+    grandTotal: 12,
+    paymentMethod: 'cash',
+    amountTendered: 12,
+    changeDue: 0,
+    paymentStatus: 'paid',
+    amountPaid: 12,
+    debtAmount: 0,
+    fulfillmentType: 'goods_and_invoice',
+    fulfillmentStatus: 'received',
+    cashierName: 'Main',
+    status: 'completed',
+    syncStatus: 'synced',
+  };
+
+  const tx2: Transaction = {
+    id: 'TXN-REP-2',
+    idempotencyKey: 'rep-2',
+    timestamp: new Date().toISOString(),
+    currency: 'USD',
+    exchangeRateUsed: 2700,
+    exchangeRatesSnapshot: { SDG: 1, USD: 2700, SAR: 720 },
+    items: [
+      {
+        productId: 'prod-2',
+        productName: mockProductB.name,
+        sku: mockProductB.sku,
+        quantity: 2,
+        unitPrice: 5,
+        discountPercent: 0,
+        total: 10,
+      },
+    ],
+    subtotal: 10,
+    taxRatePercent: 0,
+    taxAmount: 0,
+    discountAmount: 0,
+    grandTotal: 10,
+    paymentMethod: 'bank_transfer',
+    amountTendered: 5,
+    changeDue: 0,
+    paymentStatus: 'partial',
+    amountPaid: 5,
+    debtAmount: 5,
+    fulfillmentType: 'invoice_only',
+    fulfillmentStatus: 'pending_goods',
+    cashierName: 'Main',
+    status: 'completed',
+    syncStatus: 'synced',
+  };
+
+  const rates = { SDG: 1, USD: 2700, SAR: 720, AED: 735, EUR: 2950, GBP: 3450 };
+
+  const reportInUsd = computeStoreReportAnalytics(
+    [tx1, tx2],
+    products,
+    [],
+    'USD',
+    rates,
+    'live',
+    'USD'
+  );
+
+  assert.equal(reportInUsd.grossSales, 22);
+  assert.equal(reportInUsd.collectedSales, 17);
+  assert.equal(reportInUsd.outstandingDebt, 5);
+  assert.equal(reportInUsd.fulfillmentStats.receivedCount, 1);
+  assert.equal(reportInUsd.fulfillmentStats.pendingGoodsCount, 1);
+  assert.equal(reportInUsd.fulfillmentStats.fulfillmentRatePercent, 50);
+
+  // Switch currency to SDG: 22 USD * 2700 = 59,400 SDG
+  const reportInSdg = computeStoreReportAnalytics(
+    [tx1, tx2],
+    products,
+    [],
+    'SDG',
+    rates,
+    'live',
+    'USD'
+  );
+  assert.equal(reportInSdg.grossSales, 59400);
+  assert.equal(reportInSdg.productReports[0].productId, 'prod-1');
+  assert.equal(reportInSdg.productReports[0].unitsSold, 3);
+  assert.equal(reportInSdg.productReports[0].pricesByCurrency.USD, 4);
+  assert.equal(reportInSdg.productReports[0].pricesByCurrency.SDG, 10800);
+  // Historical USD baseline is 2500 -> 4 * 2500 = 10000 SDG vs current 10800 SDG (+8%)
+  assert.equal(reportInSdg.productReports[0].historicalUnitPriceInSdg, 10000);
+  assert.equal(reportInSdg.productReports[0].currentUnitPriceInSdg, 10800);
+  assert.equal(reportInSdg.productReports[0].priceChangePercentInSdg, 8);
+
+  const fluctuations = computeExchangeRateFluctuationSummary(rates, []);
+  const usdFluct = fluctuations.find((f) => f.currency === 'USD');
+  assert.ok(usdFluct);
+  assert.equal(usdFluct.currentRate, 2700);
+  assert.equal(usdFluct.previousRate, 2500);
+  assert.equal(usdFluct.changePercent, 8);
+  assert.equal(usdFluct.direction, 'up');
+});
+
+test('multi-unit packaging (strip vs pack of 8 strips) computes unit/pack prices, stock breakdown, and cart totals accurately', () => {
+  const dyeProduct: Product = {
+    id: 'prod-dye-1',
+    name: 'Natural Hair Dye',
+    nameAr: 'صبغة شعر طبيعية',
+    sku: 'DYE-008',
+    barcode: '628990011223',
+    category: 'Cosmetics',
+    costPrice: 1000, // 1 strip cost = 1000 SDG
+    sellingPrice: 1500, // 1 strip sell = 1500 SDG
+    priceCurrency: 'SDG',
+    stock: 40, // 40 strips = 5 packs of 8 strips
+    minStockAlert: 8,
+    enablePackaging: true,
+    unitName: 'Strip',
+    unitNameAr: 'شريط',
+    packName: 'Pack',
+    packNameAr: 'باكو',
+    unitsPerPack: 8,
+    defaultSaleUnit: 'unit',
+    allowedSaleUnits: 'both',
+    packCostPrice: 8000,
+    packSellingPrice: 11500, // Custom discounted pack selling price (11,500 SDG instead of 12,000 SDG)
+    updatedAt: new Date().toISOString(),
+  };
+
+  const pkg = getProductPackaging(dyeProduct);
+  assert.equal(pkg.enablePackaging, true);
+  assert.equal(pkg.unitsPerPack, 8);
+  assert.equal(pkg.unitNameAr, 'شريط');
+  assert.equal(pkg.packNameAr, 'باكو');
+  assert.equal(pkg.packSellingPrice, 11500);
+
+  // Stock breakdown formatting: 40 strips = "5 باكو (40 شريط)"
+  assert.equal(formatProductStockBreakdown(40, dyeProduct, 'ar'), '5 باكو (40 شريط)');
+  assert.equal(formatProductStockBreakdown(42, dyeProduct, 'ar'), '5 باكو + 2 شريط (42 شريط)');
+
+  const rates = { SDG: 1, USD: 2500 };
+
+  // Cart item sold by strip ('unit') vs sold by pack ('pack')
+  const stripItem: CartItem = {
+    product: dyeProduct,
+    quantity: 3, // 3 strips
+    itemDiscountPercent: 0,
+    selectedSaleUnit: 'unit',
+  };
+  const packItem: CartItem = {
+    product: dyeProduct,
+    quantity: 2, // 2 packs = 16 strips
+    itemDiscountPercent: 0,
+    selectedSaleUnit: 'pack',
+  };
+
+  const stripPricing = getCartItemUnitPricing(stripItem, 'SDG', rates, 'ar');
+  assert.equal(stripPricing.saleUnit, 'unit');
+  assert.equal(stripPricing.unitPrice, 1500);
+  assert.equal(stripPricing.totalStockUnitsRequired, 3);
+
+  const packPricing = getCartItemUnitPricing(packItem, 'SDG', rates, 'ar');
+  assert.equal(packPricing.saleUnit, 'pack');
+  assert.equal(packPricing.unitPrice, 11500);
+  assert.equal(packPricing.totalStockUnitsRequired, 16);
+  assert.equal(packPricing.unitLabel, 'باكو (8 شريط)');
+
+  // Cart totals for 2 packs (2 * 11,500 = 23,000 SDG)
+  const totals = calculateCartTotals([packItem], 0, 0, false, 'SDG', rates);
+  assert.equal(totals.subtotal, 23000);
+  assert.equal(totals.grandTotal, 23000);
+
+  // Validate checkout when ordering 6 packs (48 strips > 40 in stock) -> should fail stock check!
+  const overStockPackItem: CartItem = {
+    product: dyeProduct,
+    quantity: 6,
+    itemDiscountPercent: 0,
+    selectedSaleUnit: 'pack',
+  };
+  const invalidCheck = validateCheckout([overStockPackItem], 'cash', 100000, 69000);
+  assert.equal(invalidCheck.valid, false);
+  assert.ok(invalidCheck.error?.includes('requested: 48'));
+
+  // Fixed discount amount: 23,000 SDG subtotal minus 3,000 SDG custom discount amount = 20,000 SDG
+  const fixedDiscountTotals = calculateCartTotals([packItem], 10, 0, false, 'SDG', rates, 3000);
+  assert.equal(fixedDiscountTotals.subtotal, 23000);
+  assert.equal(fixedDiscountTotals.discountAmount, 3000);
+  assert.equal(fixedDiscountTotals.netSubtotal, 20000);
+  assert.equal(fixedDiscountTotals.taxAmount, 2000);
+  assert.equal(fixedDiscountTotals.grandTotal, 22000);
+
+  // Clamping fixed discount when entered amount exceeds subtotal
+  const clampedFixedTotals = calculateCartTotals([packItem], 0, 0, false, 'SDG', rates, 50000);
+  assert.equal(clampedFixedTotals.discountAmount, 23000);
+  assert.equal(clampedFixedTotals.grandTotal, 0);
+});
+
+test('applyDebtSettlementPayment supports partial installments, remaining balance tracking, payment method changes, and multiple receipt images', () => {
+  const initialTx: Transaction = {
+    id: 'TXN-DEBT-100',
+    idempotencyKey: 'idem_100',
+    timestamp: '2026-10-30T10:00:00.000Z',
+    currency: 'SDG',
+    exchangeRateUsed: 2700,
+    items: [
+      {
+        productId: 'prod-1',
+        productName: 'Coffee Beans',
+        sku: 'CFB-1',
+        quantity: 2,
+        unitPrice: 5000,
+        discountPercent: 0,
+        total: 10000,
+      },
+    ],
+    subtotal: 10000,
+    taxRatePercent: 0,
+    taxAmount: 0,
+    discountAmount: 0,
+    grandTotal: 10000,
+    paymentMethod: 'cash',
+    amountTendered: 2000,
+    changeDue: 0,
+    paymentStatus: 'partial',
+    amountPaid: 2000,
+    debtAmount: 8000,
+    transferReceiptImage: 'https://example.com/receipt-initial.jpg',
+    cashierName: 'Main',
+    status: 'completed',
+    syncStatus: 'synced',
+  };
+
+  // 1st installment: Customer pays 5,000 SDG via bank_transfer and attaches 2 receipt images
+  const firstStep = applyDebtSettlementPayment(initialTx, {
+    amountPaidInDisplayCurrency: 5000,
+    displayCurrency: 'SDG',
+    paymentMethod: 'bank_transfer',
+    transferReference: 'BNK-INST-1',
+    receiptImages: ['https://example.com/receipt-inst1-a.jpg', 'https://example.com/receipt-inst1-b.jpg'],
+    note: 'First installment',
+  });
+
+  assert.equal(firstStep.settledDeltaInTxCurrency, 5000);
+  assert.equal(firstStep.updatedTransaction.amountPaid, 7000);
+  assert.equal(firstStep.updatedTransaction.debtAmount, 3000);
+  assert.equal(firstStep.updatedTransaction.paymentStatus, 'partial');
+  assert.equal(firstStep.updatedTransaction.paymentMethod, 'bank_transfer');
+  assert.equal(firstStep.updatedTransaction.transferReference, 'BNK-INST-1');
+  assert.equal(firstStep.updatedTransaction.debtPayments?.length, 1);
+  assert.equal(
+    getAllTransactionReceiptImages(firstStep.updatedTransaction).length,
+    3
+  );
+
+  // 2nd installment: Customer pays remaining 3,000 SDG via qr_nfc and attaches 1 more receipt image
+  const secondStep = applyDebtSettlementPayment(firstStep.updatedTransaction, {
+    amountPaidInDisplayCurrency: 3000,
+    displayCurrency: 'SDG',
+    paymentMethod: 'qr_nfc',
+    transferReference: 'WALLET-INST-2',
+    receiptImages: ['https://example.com/receipt-inst2.jpg'],
+    note: 'Final settlement',
+  });
+
+  assert.equal(secondStep.settledDeltaInTxCurrency, 3000);
+  assert.equal(secondStep.updatedTransaction.amountPaid, 10000);
+  assert.equal(secondStep.updatedTransaction.debtAmount, 0);
+  assert.equal(secondStep.updatedTransaction.paymentStatus, 'paid');
+  assert.equal(secondStep.updatedTransaction.debtPayments?.length, 2);
+  assert.equal(
+    getAllTransactionReceiptImages(secondStep.updatedTransaction).length,
+    4
+  );
+});
+
+test('invoices default to saved sale-time exchange rate (historical mode) and support locking custom sale rates', () => {
+  const txAt2400: Transaction = {
+    id: 'TXN-SALE-RATE-2400',
+    idempotencyKey: 'idem_2400',
+    timestamp: '2026-10-31T08:00:00.000Z',
+    currency: 'SDG',
+    exchangeRateUsed: 2400,
+    exchangeRatesSnapshot: {
+      SDG: 1,
+      USD: 2400,
+      SAR: 640,
+    },
+    items: [
+      {
+        productId: 'prod-1',
+        productName: 'Roast Coffee',
+        sku: 'RC-1',
+        quantity: 1,
+        unitPrice: 24000,
+        discountPercent: 0,
+        total: 24000,
+      },
+    ],
+    subtotal: 24000,
+    taxRatePercent: 0,
+    taxAmount: 0,
+    discountAmount: 0,
+    grandTotal: 24000, // Worth $10 USD at sale time (rate = 2400)
+    paymentMethod: 'cash',
+    amountTendered: 12000,
+    changeDue: 0,
+    paymentStatus: 'partial',
+    amountPaid: 12000,
+    debtAmount: 12000,
+    cashierName: 'Main',
+    status: 'completed',
+    syncStatus: 'synced',
+  };
+
+  // Even when live rates jump to 3000 SDG/USD, default getConvertedTransactionView preserves the saved 2400 sale rate
+  const liveRates = { SDG: 1, USD: 3000, SAR: 800 };
+  const defaultSdgView = getConvertedTransactionView(txAt2400, 'SDG', liveRates);
+  assert.equal(defaultSdgView.grandTotal, 24000);
+  assert.equal(defaultSdgView.historicalRate, 2400);
+  assert.equal(defaultSdgView.currentRate, 3000);
+
+  const defaultUsdView = getConvertedTransactionView(txAt2400, 'USD', liveRates);
+  assert.equal(defaultUsdView.grandTotal, 10);
+  assert.equal(defaultUsdView.amountPaid, 5);
+  assert.equal(defaultUsdView.debtAmount, 5);
+
+  // Locking a custom sale exchange rate (e.g. 2600 SDG/USD) updates exchangeRateUsed & snapshot without altering SDG total
+  const locked2600 = lockTransactionSaleExchangeRate(txAt2400, 2600, 'USD');
+  assert.equal(locked2600.grandTotal, 24000);
+  assert.equal(locked2600.exchangeRateUsed, 2600);
+  assert.equal(locked2600.exchangeRatesSnapshot?.USD, 2600);
+});
+
+test('computeDailyRevenueTrends aggregates daily revenue, converts currencies, and identifies performance peaks', () => {
+  const refDate = new Date('2026-10-31T15:00:00.000Z');
+  const dayMinus2 = new Date(refDate);
+  dayMinus2.setDate(refDate.getDate() - 2);
+  const dayMinus1 = new Date(refDate);
+  dayMinus1.setDate(refDate.getDate() - 1);
+
+  const txDayMinus2: Transaction = {
+    id: 'TXN-TREND-1',
+    idempotencyKey: 'trend_1',
+    timestamp: dayMinus2.toISOString(),
+    currency: 'SDG',
+    exchangeRateUsed: 2500,
+    exchangeRatesSnapshot: { SDG: 1, USD: 2500 },
+    items: [
+      {
+        productId: 'prod-1',
+        productName: 'Coffee',
+        sku: 'COF-1',
+        quantity: 2,
+        unitPrice: 25000,
+        discountPercent: 0,
+        total: 50000,
+      },
+    ],
+    subtotal: 50000,
+    taxRatePercent: 0,
+    taxAmount: 0,
+    discountAmount: 0,
+    grandTotal: 50000, // $20 USD at 2500 rate
+    paymentMethod: 'cash',
+    amountTendered: 50000,
+    changeDue: 0,
+    paymentStatus: 'paid',
+    amountPaid: 50000,
+    debtAmount: 0,
+    cashierName: 'Main',
+    status: 'completed',
+    syncStatus: 'synced',
+  };
+
+  const txDayMinus1Peak: Transaction = {
+    id: 'TXN-TREND-2',
+    idempotencyKey: 'trend_2',
+    timestamp: dayMinus1.toISOString(),
+    currency: 'SDG',
+    exchangeRateUsed: 2500,
+    exchangeRatesSnapshot: { SDG: 1, USD: 2500 },
+    items: [
+      {
+        productId: 'prod-1',
+        productName: 'Coffee',
+        sku: 'COF-1',
+        quantity: 5,
+        unitPrice: 25000,
+        discountPercent: 0,
+        total: 125000,
+      },
+    ],
+    subtotal: 125000,
+    taxRatePercent: 0,
+    taxAmount: 0,
+    discountAmount: 0,
+    grandTotal: 125000, // $50 USD at 2500 rate (Peak Day)
+    paymentMethod: 'bank_transfer',
+    amountTendered: 100000,
+    changeDue: 0,
+    paymentStatus: 'partial',
+    amountPaid: 100000,
+    debtAmount: 25000,
+    cashierName: 'Main',
+    status: 'completed',
+    syncStatus: 'synced',
+  };
+
+  const txToday: Transaction = {
+    id: 'TXN-TREND-3',
+    idempotencyKey: 'trend_3',
+    timestamp: refDate.toISOString(),
+    currency: 'SDG',
+    exchangeRateUsed: 2700,
+    exchangeRatesSnapshot: { SDG: 1, USD: 2700 },
+    items: [
+      {
+        productId: 'prod-1',
+        productName: 'Coffee',
+        sku: 'COF-1',
+        quantity: 3,
+        unitPrice: 27000,
+        discountPercent: 0,
+        total: 81000,
+      },
+    ],
+    subtotal: 81000,
+    taxRatePercent: 0,
+    taxAmount: 0,
+    discountAmount: 0,
+    grandTotal: 81000, // $30 USD at 2700 rate
+    paymentMethod: 'cash',
+    amountTendered: 81000,
+    changeDue: 0,
+    paymentStatus: 'paid',
+    amountPaid: 81000,
+    debtAmount: 0,
+    cashierName: 'Main',
+    status: 'completed',
+    syncStatus: 'synced',
+  };
+
+  const rates = { SDG: 1, USD: 2700 };
+
+  // Evaluate 7-day trend in SDG
+  const summarySdg = computeDailyRevenueTrends(
+    [txDayMinus2, txDayMinus1Peak, txToday],
+    7,
+    'SDG',
+    rates,
+    'historical',
+    'en',
+    refDate
+  );
+
+  assert.equal(summarySdg.points.length, 7);
+  assert.equal(summarySdg.totalRevenue, 256000);
+  assert.equal(summarySdg.totalCollected, 231000);
+  assert.equal(summarySdg.totalDebt, 25000);
+  assert.equal(summarySdg.totalTransactions, 3);
+  assert.ok(summarySdg.peakPoint);
+  assert.equal(summarySdg.peakPoint?.revenue, 125000);
+  assert.equal(summarySdg.peakPoint?.isPeak, true);
+
+  // Evaluate 7-day trend in USD using historical sale-time exchange rates ($20 + $50 + $30 = $100)
+  const summaryUsd = computeDailyRevenueTrends(
+    [txDayMinus2, txDayMinus1Peak, txToday],
+    7,
+    'USD',
+    rates,
+    'historical',
+    'en',
+    refDate
+  );
+  assert.equal(summaryUsd.totalRevenue, 100);
+  assert.equal(summaryUsd.peakPoint?.revenue, 50);
+});

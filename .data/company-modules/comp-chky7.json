@@ -1,0 +1,152 @@
+{
+  "storeSettings": {
+    "storeName": "Restored Branch Co hkmt",
+    "storeNameAr": "Restored Branch Co hkmt",
+    "currency": "SDG",
+    "taxRatePercent": 15
+  },
+  "invoiceSettings": {
+    "showLogo": true,
+    "footerNote": "Thank you for shopping with us"
+  },
+  "currencies": [
+    {
+      "code": "SDG",
+      "name": "Sudanese Pound",
+      "nameAr": "جنيه سوداني",
+      "symbol": "ج.س",
+      "decimalPlaces": 2,
+      "isBase": true,
+      "isActive": true
+    },
+    {
+      "code": "SAR",
+      "name": "Saudi Riyal",
+      "nameAr": "ريال سعودي",
+      "symbol": "ر.س",
+      "decimalPlaces": 2,
+      "isBase": false,
+      "isActive": true
+    }
+  ],
+  "exchangeRates": {
+    "SDG": 1,
+    "SAR": 720
+  },
+  "exchangeRateItems": [
+    {
+      "id": "rate-sar-sdg",
+      "sourceCurrency": "SAR",
+      "targetCurrency": "SDG",
+      "rate": 720,
+      "inverseRate": 0.001388888888888889,
+      "effectiveFrom": "2026-11-05T09:30:18.940Z",
+      "expiryDate": null,
+      "isActive": true
+    }
+  ],
+  "exchangeRateHistory": [],
+  "unitsOfMeasure": [
+    {
+      "id": "uom-box",
+      "code": "BOX",
+      "name": "Box",
+      "dimension": "count",
+      "isBaseUnit": false
+    }
+  ],
+  "customFieldDefinitions": [
+    {
+      "id": "cf-expiry",
+      "name": "Batch Code",
+      "fieldType": "text"
+    }
+  ],
+  "categories": [
+    {
+      "id": "cat-chky7-1m2me",
+      "companyId": "comp-chky7",
+      "name": "Beverages",
+      "nameAr": "مشروبات",
+      "slug": "beverages-chky7"
+    }
+  ],
+  "suppliers": [
+    {
+      "id": "sup-chky7-clgie",
+      "companyId": "comp-chky7",
+      "name": "Blue Nile Roasters Supply",
+      "phone": "0915556677",
+      "taxNumber": "TIN-889900"
+    }
+  ],
+  "purchases": [
+    {
+      "id": "po-chky7-i262c",
+      "companyId": "comp-chky7",
+      "purchaseNumber": "PO-2025-001-CHKY7",
+      "supplierId": "sup-chky7-clgie",
+      "supplierName": "Blue Nile Roasters Supply",
+      "status": "received",
+      "currency": "SDG",
+      "totalAmount": 100000,
+      "items": [
+        {
+          "productId": "prod-chky7-4pxfs",
+          "productName": "Artisan Arabic Coffee 500g",
+          "sku": "COF-500",
+          "quantity": 25,
+          "unitCost": 4000,
+          "totalCost": 100000
+        }
+      ],
+      "createdAt": "2026-11-05T09:30:18.940Z",
+      "branchId": "br-chky7-0thpb"
+    }
+  ],
+  "expenses": [
+    {
+      "id": "exp-chky7-zenn7",
+      "companyId": "comp-chky7",
+      "title": "Store Electricity Bill",
+      "category": "Utilities",
+      "amount": 15000,
+      "currency": "SDG",
+      "date": "2026-11-05T09:30:18.940Z",
+      "branchId": "br-chky7-0thpb"
+    }
+  ],
+  "accounts": [
+    {
+      "id": "acc-chky7-94wu5",
+      "companyId": "comp-chky7",
+      "code": "1010",
+      "name": "Main Cash Register",
+      "nameAr": "الخزينة الرئيسية",
+      "type": "asset",
+      "currency": "SDG",
+      "balance": 96000
+    }
+  ],
+  "journalEntries": [
+    {
+      "id": "je-chky7-ixz0l",
+      "companyId": "comp-chky7",
+      "date": "2026-11-05T09:30:18.940Z",
+      "reference": "TXN-501",
+      "description": "POS Cash Sale TXN-501",
+      "currency": "SDG",
+      "totalDebit": 11000,
+      "totalCredit": 11000,
+      "lines": [
+        {
+          "accountId": "acc-chky7-94wu5",
+          "accountCode": "1010",
+          "debit": 11000,
+          "credit": 0
+        }
+      ]
+    }
+  ],
+  "branchTransfers": []
+}

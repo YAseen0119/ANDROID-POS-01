@@ -15,10 +15,26 @@ import { CustomersView } from './components/customers/CustomersView';
 import { SalesView } from './components/sales/SalesView';
 import { ReportsView } from './components/reports/ReportsView';
 import { SettingsView } from './components/settings/SettingsView';
+import { TrainingTourOverlay } from './components/tour/TrainingTourOverlay';
+import { UnmetDemandCaptureModal } from './components/analytics/UnmetDemandCaptureModal';
+import { PracticeModeBanner } from './components/onboarding/PracticeModeBanner';
+import { FirstRunOnboardingModal } from './components/onboarding/FirstRunOnboardingModal';
 import { StatusBar, Style } from '@capacitor/status-bar';
 
 function POSAppInner() {
-  const { activeTab, setActiveTab } = usePOS();
+  const {
+    activeTab,
+    setActiveTab,
+    isTrainingTourOpen,
+    trainingTourStepIndex,
+    trainingTourProgress,
+    selectTrainingTourStep,
+    nextTrainingTourStep,
+    prevTrainingTourStep,
+    finishTrainingTour,
+    closeTrainingTour,
+    resetTrainingTour,
+  } = usePOS();
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
 
   // Initialize Capacitor Android status bar and hardware back button listener
@@ -45,6 +61,9 @@ function POSAppInner() {
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col font-sans select-none">
+      {/* Persistent Practice Mode Top Indicator & Controls (visible only in Practice Mode) */}
+      <PracticeModeBanner />
+
       {/* Top Header */}
       <AppHeader onOpenCart={() => setIsMobileCartOpen(true)} />
 
@@ -64,6 +83,25 @@ function POSAppInner() {
         {activeTab === 'reports' && <ReportsView />}
         {activeTab === 'settings' && <SettingsView />}
       </main>
+
+      {/* Fast Customer Unmet Demand Request Capture Modal */}
+      <UnmetDemandCaptureModal />
+
+      {/* First-Run Onboarding, Practice Mode & Company Workspace Modal */}
+      <FirstRunOnboardingModal />
+
+      {/* Interactive Guided Training Tour Overlay */}
+      <TrainingTourOverlay
+        isOpen={isTrainingTourOpen}
+        currentStepIndex={trainingTourStepIndex}
+        progress={trainingTourProgress}
+        onSelectStep={selectTrainingTourStep}
+        onNext={nextTrainingTourStep}
+        onPrev={prevTrainingTourStep}
+        onFinish={finishTrainingTour}
+        onClose={closeTrainingTour}
+        onResetProgress={resetTrainingTour}
+      />
 
       {/* Fixed Bottom Navigation */}
       <BottomNavigation />

@@ -13,8 +13,8 @@ import { AppCard } from '../ui/AppCard';
 import { AppInput } from '../ui/AppInput';
 import { TactileButton } from '../ui/TactileButton';
 import { AppModal } from '../ui/AppModal';
+import { GoodsReceiptModal } from './GoodsReceiptModal';
 import {
-  Layers,
   ArrowUpRight,
   ArrowDownLeft,
   AlertTriangle,
@@ -23,14 +23,19 @@ import {
   TrendingUp,
   DollarSign,
   PackageCheck,
+  FileText,
+  Truck,
 } from 'lucide-react';
 
 export const InventoryView: React.FC = () => {
   const { products, stockMovements, recordStockAdjustment, settings, exchangeRates } = usePOS();
   const t = getTranslation(settings.language);
+  const isAr = settings.language === 'ar';
 
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
+  const [isGoodsReceiptOpen, setIsGoodsReceiptOpen] = useState(false);
+  const [goodsReceiptProduct, setGoodsReceiptProduct] = useState<Product | null>(null);
   const [movementType, setMovementType] = useState<StockMovementType>('restock');
   const [amountInput, setAmountInput] = useState('10');
   const [reasonInput, setReasonInput] = useState('');
@@ -63,6 +68,11 @@ export const InventoryView: React.FC = () => {
     setIsAdjustModalOpen(true);
   };
 
+  const openGoodsReceipt = (product?: Product) => {
+    setGoodsReceiptProduct(product || null);
+    setIsGoodsReceiptOpen(true);
+  };
+
   const handleApplyAdjustment = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedProduct) return;
@@ -82,8 +92,22 @@ export const InventoryView: React.FC = () => {
             {t.inventoryManagement}
           </h2>
           <span className="text-xs text-neutral-400">
-            Real-time multi-SKU inventory tracking and audit logs
+            {isAr
+              ? 'إدارة المخزون، استلام فواتير المشتريات والبضائع، وسجل الحركات المباشر'
+              : 'Real-time multi-SKU inventory tracking, goods receipt & audit logs'}
           </span>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <TactileButton
+            variant="emerald"
+            size="sm"
+            data-testid="inventory-open-goods-receipt-btn"
+            onClick={() => openGoodsReceipt()}
+            leftIcon={<PackageCheck className="w-4 h-4" />}
+          >
+            {t.receiveSupplierGoodsBtn}
+          </TactileButton>
         </div>
       </div>
 
@@ -97,7 +121,9 @@ export const InventoryView: React.FC = () => {
           <div className="text-2xl font-bold font-mono text-white tabular-nums">
             {formatCurrency(valuation.cost, settings.currency, settings.language)}
           </div>
-          <span className="text-[11px] text-neutral-500">Based on unit cost price</span>
+          <span className="text-[11px] text-neutral-500">
+            {isAr ? 'بناءً على سعر التكلفة للوحدة' : 'Based on unit cost price'}
+          </span>
         </AppCard>
 
         <AppCard>
@@ -108,7 +134,9 @@ export const InventoryView: React.FC = () => {
           <div className="text-2xl font-bold font-mono text-amber-400 tabular-nums">
             {formatCurrency(valuation.revenue, settings.currency, settings.language)}
           </div>
-          <span className="text-[11px] text-neutral-500">Estimated retail liquidation</span>
+          <span className="text-[11px] text-neutral-500">
+            {isAr ? 'الإيراد التقديري عند بيع المخزون' : 'Estimated retail liquidation'}
+          </span>
         </AppCard>
 
         <AppCard className={valuation.lowStockCount > 0 ? 'border-amber-500/50 bg-amber-950/20' : ''}>
@@ -116,10 +144,15 @@ export const InventoryView: React.FC = () => {
             <span className="text-xs font-semibold text-neutral-400">{t.lowStockAlerts}</span>
             <AlertTriangle className="w-4 h-4 text-rose-400" />
           </div>
-          <div className="text-2xl font-bold font-mono text-white tabular-nums">
-            {valuation.lowStockCount} items
+          <div className="text-2xl font-bold text-white">
+            <span className="font-mono tabular-nums">{valuation.lowStockCount}</span>{' '}
+            <span className="text-sm font-normal text-neutral-400">
+              {isAr ? 'أصناف' : 'items'}
+            </span>
           </div>
-          <span className="text-[11px] text-neutral-500">Threshold alert triggers</span>
+          <span className="text-[11px] text-neutral-500">
+            {isAr ? 'أصناف وصلت لحد التنبيه' : 'Threshold alert triggers'}
+          </span>
         </AppCard>
       </div>
 
@@ -128,10 +161,13 @@ export const InventoryView: React.FC = () => {
         <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
           <div className="flex items-center gap-2">
             <PackageCheck className="w-4 h-4 text-amber-500" />
-            <h3 className="font-bold text-sm text-white">Stock Levels by Product</h3>
+            <h3 className="font-bold text-sm text-white">
+              {isAr ? 'مستويات المخزون حسب المنتج' : 'Stock Levels by Product'}
+            </h3>
           </div>
-          <span className="text-xs text-neutral-500 font-mono">
-            {products.length} catalog items
+          <span className="text-xs text-neutral-500">
+            <span className="font-mono tabular-nums">{products.length}</span>{' '}
+            {isAr ? 'صنف مسجل' : 'catalog items'}
           </span>
         </div>
 
@@ -158,43 +194,63 @@ export const InventoryView: React.FC = () => {
                     </span>
                   )}
                   <div>
-                    <div className="font-bold text-sm text-white">{p.name}</div>
-                    <div className="text-xs font-mono text-neutral-400 flex flex-wrap items-center gap-2">
-                      <span>{p.sku}</span>
+                    <div className="font-bold text-sm text-white">
+                      {isAr && p.nameAr ? p.nameAr : p.name}
+                    </div>
+                    <div className="text-xs text-neutral-400 flex flex-wrap items-center gap-2">
+                      <span className="font-mono">{p.sku}</span>
                       <span>·</span>
                       <span>
-                        Cost: {formatCurrency(converted.costPrice, settings.currency, settings.language)}
+                        {isAr ? 'الشراء:' : 'Cost:'}{' '}
+                        <span className="font-mono tabular-nums">
+                          {formatCurrency(converted.costPrice, settings.currency, settings.language)}
+                        </span>
                       </span>
                       <span>·</span>
                       <span className="text-emerald-400">
-                        Sell: {formatCurrency(converted.sellingPrice, settings.currency, settings.language)}
+                        {isAr ? 'البيع:' : 'Sell:'}{' '}
+                        <span className="font-mono tabular-nums">
+                          {formatCurrency(converted.sellingPrice, settings.currency, settings.language)}
+                        </span>
                       </span>
                     </div>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between sm:justify-end gap-4">
+                <div className="flex flex-wrap items-center justify-between sm:justify-end gap-3">
                   <div className="text-right">
                     <span
-                      className={`text-sm font-mono font-bold tabular-nums ${
+                      className={`text-sm font-bold ${
                         isOut ? 'text-rose-400' : isLow ? 'text-amber-400' : 'text-emerald-400'
                       }`}
                     >
-                      {p.stock} units
+                      <span className="font-mono tabular-nums">{p.stock}</span>{' '}
+                      {isAr ? 'وحدة' : 'units'}
                     </span>
                     <span className="block text-[10px] text-neutral-500">
                       {isOut ? t.outOfStock : isLow ? t.lowStock : t.inStock}
                     </span>
                   </div>
 
-                  <TactileButton
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => openAdjustment(p)}
-                    leftIcon={<PlusCircle className="w-3.5 h-3.5" />}
-                  >
-                    {t.adjustStock}
-                  </TactileButton>
+                  <div className="flex items-center gap-1.5">
+                    <TactileButton
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => openGoodsReceipt(p)}
+                      leftIcon={<Truck className="w-3.5 h-3.5 text-emerald-400" />}
+                    >
+                      {isAr ? 'استلام بضاعة' : 'Receive Goods'}
+                    </TactileButton>
+
+                    <TactileButton
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => openAdjustment(p)}
+                      leftIcon={<PlusCircle className="w-3.5 h-3.5" />}
+                    >
+                      {t.adjustStock}
+                    </TactileButton>
+                  </div>
                 </div>
               </div>
             );
@@ -209,19 +265,20 @@ export const InventoryView: React.FC = () => {
             <History className="w-4 h-4 text-purple-400" />
             <h3 className="font-bold text-sm text-white">{t.movementHistory}</h3>
           </div>
-          <span className="text-xs text-neutral-500 font-mono">
-            {stockMovements.length} audit records
+          <span className="text-xs text-neutral-500">
+            <span className="font-mono tabular-nums">{stockMovements.length}</span>{' '}
+            {isAr ? 'سجل حركة' : 'audit records'}
           </span>
         </div>
 
         <div className="divide-y divide-neutral-800/80 mt-1 max-h-80 overflow-y-auto pr-1">
           {stockMovements.map((mov) => {
-            const isPositive = mov.quantityChange > 0;
+            const isPositive = mov.quantityChange >= 0;
             return (
               <div key={mov.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
                 <div className="flex items-center gap-2.5">
                   <div
-                    className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold ${
+                    className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold shrink-0 ${
                       isPositive
                         ? 'bg-emerald-500/10 text-emerald-400'
                         : 'bg-rose-500/10 text-rose-400'
@@ -234,20 +291,55 @@ export const InventoryView: React.FC = () => {
                     )}
                   </div>
                   <div>
-                    <span className="font-bold text-white block">{mov.productName}</span>
-                    <span className="text-neutral-500 text-[11px]">
-                      {mov.reason} • {new Date(mov.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="font-bold text-white">{mov.productName}</span>
+                      {mov.receiptMode && (
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800/50 flex items-center gap-1">
+                          {mov.receiptMode === 'invoice_only' ? (
+                            <FileText className="w-2.5 h-2.5" />
+                          ) : (
+                            <PackageCheck className="w-2.5 h-2.5" />
+                          )}
+                          <span>
+                            {mov.receiptMode === 'goods_and_invoice'
+                              ? isAr
+                                ? 'استلام بضاعة وفاتورة'
+                                : 'Goods & Invoice'
+                              : mov.receiptMode === 'goods_only'
+                              ? isAr
+                                ? 'استلام بضاعة فقط'
+                                : 'Goods Only'
+                              : isAr
+                              ? 'استلام فاتورة فقط'
+                              : 'Invoice Only'}
+                          </span>
+                        </span>
+                      )}
+                      {mov.invoiceNumber && (
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-neutral-900 text-amber-300 border border-neutral-800">
+                          {mov.invoiceNumber}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-neutral-500 text-[11px] block">
+                      {mov.reason} •{' '}
+                      <span className="font-mono">
+                        {new Date(mov.timestamp).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
                     </span>
                   </div>
                 </div>
 
-                <div className="text-right">
+                <div className="text-right shrink-0">
                   <span
                     className={`font-mono font-bold tabular-nums ${
                       isPositive ? 'text-emerald-400' : 'text-rose-400'
                     }`}
                   >
-                    {isPositive ? `+${mov.quantityChange}` : mov.quantityChange}
+                    {mov.quantityChange > 0 ? `+${mov.quantityChange}` : mov.quantityChange}
                   </span>
                   <span className="block text-[10px] font-mono text-neutral-500">
                     {mov.previousStock} → {mov.newStock}
@@ -258,6 +350,13 @@ export const InventoryView: React.FC = () => {
           })}
         </div>
       </AppCard>
+
+      {/* Goods Receipt / Supplier Purchase Invoice Modal */}
+      <GoodsReceiptModal
+        isOpen={isGoodsReceiptOpen}
+        onClose={() => setIsGoodsReceiptOpen(false)}
+        initialProduct={goodsReceiptProduct}
+      />
 
       {/* Adjustment Modal */}
       <AppModal

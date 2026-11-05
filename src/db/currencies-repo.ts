@@ -726,8 +726,40 @@ export async function updateExchangeRate(
     }
   }
 
+  const pairMatch = id.match(/^(?:rate|effective)-([a-z0-9]+)-([a-z0-9]+)(?:-.+)?$/i);
+
   if (db) {
-    const existing = await db.select().from(exchangeRates).where(eq(exchangeRates.id, id));
+    let targetId = id;
+    let existing = await db.select().from(exchangeRates).where(eq(exchangeRates.id, targetId));
+
+    if (existing.length === 0 && pairMatch) {
+      const src = pairMatch[1].toUpperCase();
+      const tgt = pairMatch[2].toUpperCase();
+      if (updates.rate !== undefined) {
+        return setExchangeRate({
+          sourceCurrency: src,
+          targetCurrency: tgt,
+          rate: Number(updates.rate),
+          expiryDate: updates.expiryDate,
+        });
+      }
+      const latestForPair = await db
+        .select()
+        .from(exchangeRates)
+        .where(
+          and(
+            eq(exchangeRates.sourceCurrency, src),
+            eq(exchangeRates.targetCurrency, tgt)
+          )
+        )
+        .orderBy(desc(exchangeRates.effectiveFrom))
+        .limit(1);
+      if (latestForPair.length > 0) {
+        existing = latestForPair;
+        targetId = latestForPair[0].id;
+      }
+    }
+
     if (existing.length === 0) {
       throw new Error(`Exchange rate record with ID "${id}" not found.`);
     }
@@ -743,9 +775,9 @@ export async function updateExchangeRate(
       payload.isActive = Boolean(updates.isActive);
     }
 
-    await db.update(exchangeRates).set(payload).where(eq(exchangeRates.id, id));
+    await db.update(exchangeRates).set(payload).where(eq(exchangeRates.id, targetId));
 
-    const refreshed = await db.select().from(exchangeRates).where(eq(exchangeRates.id, id));
+    const refreshed = await db.select().from(exchangeRates).where(eq(exchangeRates.id, targetId));
     const r = refreshed[0];
     const rateNum = parseFloat(r.rate);
     return {
@@ -761,31 +793,75 @@ export async function updateExchangeRate(
     };
   }
 
+  const memIdx = DEFAULT_RATES.findIndex(
+    (r) =>
+      r.id === id ||
+      (pairMatch &&
+        r.sourceCurrency === pairMatch[1].toUpperCase() &&
+        r.targetCurrency === pairMatch[2].toUpperCase())
+  );
+  if (memIdx >= 0) {
+    if (updates.rate !== undefined) DEFAULT_RATES[memIdx].rate = Number(updates.rate);
+    if (updates.isActive !== undefined) DEFAULT_RATES[memIdx].isActive = Boolean(updates.isActive);
+    return {
+      ...DEFAULT_RATES[memIdx],
+      inverseRate: DEFAULT_RATES[memIdx].rate > 0 ? 1 / DEFAULT_RATES[memIdx].rate : 0,
+    };
+  }
+
   throw new Error('Database connection required to update exchange rate.');
 }
 
 /**
  * Delete / deactivate an exchange rate record.
+ * Supports both database record IDs and seed/synthetic rate IDs (e.g. "rate-usd-sdg-initial", "effective-usd-sdg") idempotently.
  */
 export async function deleteExchangeRate(id: string): Promise<{ deleted: boolean; id: string }> {
   if (!id) {
     throw new Error('Exchange rate ID is required.');
   }
 
-  if (db) {
-    const existing = await db.select().from(exchangeRates).where(eq(exchangeRates.id, id));
-    if (existing.length === 0) {
-      throw new Error(`Exchange rate record "${id}" not found.`);
-    }
-
-    await db.delete(exchangeRates).where(eq(exchangeRates.id, id));
-    return { deleted: true, id };
-  }
+  const pairMatch = id.match(/^(?:rate|effective)-([a-z0-9]+)-([a-z0-9]+)(?:-.+)?$/i);
 
   const idx = DEFAULT_RATES.findIndex((r) => r.id === id);
   if (idx >= 0) {
     DEFAULT_RATES.splice(idx, 1);
   }
+
+  if (db) {
+    try {
+      const existing = await db.select().from(exchangeRates).where(eq(exchangeRates.id, id));
+      if (existing.length > 0) {
+        await db.delete(exchangeRates).where(eq(exchangeRates.id, id));
+        return { deleted: true, id };
+      }
+
+      if (pairMatch) {
+        const src = pairMatch[1].toUpperCase();
+        const tgt = pairMatch[2].toUpperCase();
+        const latestForPair = await db
+          .select()
+          .from(exchangeRates)
+          .where(
+            and(
+              eq(exchangeRates.sourceCurrency, src),
+              eq(exchangeRates.targetCurrency, tgt),
+              eq(exchangeRates.isActive, true)
+            )
+          )
+          .orderBy(desc(exchangeRates.effectiveFrom))
+          .limit(1);
+
+        if (latestForPair.length > 0) {
+          await db.delete(exchangeRates).where(eq(exchangeRates.id, latestForPair[0].id));
+        }
+        return { deleted: true, id };
+      }
+    } catch (err) {
+      console.warn(`PostgreSQL deleteExchangeRate fallback for ${id}:`, err);
+    }
+  }
+
   return { deleted: true, id };
 }
 

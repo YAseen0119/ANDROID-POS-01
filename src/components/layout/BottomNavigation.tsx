@@ -54,7 +54,7 @@ export const BottomNavigation: React.FC = () => {
       role="navigation"
       aria-label="Main application navigation"
     >
-      <div className="max-w-7xl mx-auto px-2 flex items-center justify-around h-16 overflow-x-auto">
+      <div className="max-w-[1600px] mx-auto px-1 sm:px-3 grid grid-cols-8 gap-0.5 sm:gap-1.5 h-16 items-center">
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -63,23 +63,24 @@ export const BottomNavigation: React.FC = () => {
           return (
             <button
               key={item.id}
+              data-testid={`nav-tab-${item.id}`}
               onClick={() => handleSelect(item.id)}
               aria-label={label}
-              className={`relative flex flex-col items-center justify-center min-w-[56px] min-h-[48px] px-2 py-1 transition-all select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50 rounded-xl ${
+              className={`relative flex flex-col items-center justify-center min-w-0 w-full min-h-[48px] px-0.5 sm:px-2 py-1 transition-all select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50 rounded-xl ${
                 isActive ? 'text-amber-400 font-semibold' : 'text-neutral-400 hover:text-neutral-200'
               }`}
             >
               {isActive && (
                 <motion.div
                   layoutId="activeTabBadge"
-                  className="absolute inset-0 bg-neutral-850/90 border border-neutral-700/60 rounded-xl"
+                  className="absolute inset-0 bg-neutral-900 border border-neutral-700/70 rounded-xl"
                   transition={{ type: 'spring', stiffness: 500, damping: 35 }}
                 />
               )}
 
-              <div className="relative z-10 flex flex-col items-center">
-                <Icon className={`w-5 h-5 transition-transform ${isActive ? 'scale-110' : ''}`} />
-                <span className="text-[10px] tracking-tight mt-0.5 whitespace-nowrap">
+              <div className="relative z-10 flex flex-col items-center min-w-0 w-full">
+                <Icon className={`w-4 h-4 sm:w-5 sm:h-5 transition-transform shrink-0 ${isActive ? 'scale-110' : ''}`} />
+                <span className="text-[9px] sm:text-[10px] tracking-tight mt-0.5 truncate max-w-full px-0.5">
                   {label}
                 </span>
               </div>

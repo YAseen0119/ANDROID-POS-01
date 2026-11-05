@@ -80,7 +80,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
   onClose,
   transaction,
   onNewSale,
-  valuationMode = 'live',
+  valuationMode = 'historical',
   anchorCurrency = 'USD',
 }) => {
   const { settings, updateSettings, exchangeRates } = usePOS();
@@ -540,11 +540,9 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
                     </div>
                   )}
                   <div className="flex justify-between">
-                    <span>{t.currency}:</span>
-                    <span className="font-bold font-mono">
-                      {settings.currency}
-                      {converted.referenceCurrency !== 'SDG' &&
-                        ` (1 ${converted.referenceCurrency} = ${converted.currentRate} SDG)`}
+                    <span>{isAr ? 'سعر الصرف وقت البيع:' : 'Sale Exchange Rate:'}</span>
+                    <span className="font-bold font-mono" dir="ltr">
+                      1 {converted.referenceCurrency} = {converted.historicalRate} SDG
                     </span>
                   </div>
                   {converted.originalCurrency !== settings.currency && (

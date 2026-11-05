@@ -1,0 +1,12 @@
+[
+  {
+    "id": "rate-sar-sdg",
+    "sourceCurrency": "SAR",
+    "targetCurrency": "SDG",
+    "rate": 720,
+    "inverseRate": 0.001388888888888889,
+    "effectiveFrom": "2026-11-05T10:07:35.860Z",
+    "expiryDate": null,
+    "isActive": true
+  }
+]

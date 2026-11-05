@@ -81,3 +81,14 @@
   transform: translateY(3px);
 }
 
+/* Transparent WebView support when @capacitor-mlkit/barcode-scanning startScan() renders camera behind WebView */
+body.barcode-scanner-active,
+html:has(body.barcode-scanner-active) {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+body.barcode-scanner-active #root {
+  background: transparent !important;
+}
+
